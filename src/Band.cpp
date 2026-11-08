@@ -615,6 +615,168 @@ namespace Band
 			return mine;
 		}
 
+		// 肌の体の点（足元 z=0 の座標）と外向きの法線。下着を体に寄せるときの基準
+		struct SkinPt
+		{
+			float p[3];
+			float n[3];
+		};
+
+		// 肌でない shape（下着）の、体から a_limit より外に出ている頂点を、体から a_limit の所まで寄せた自前の skinPartition を作る。
+		// スカートはお尻のあたりで体から 1 以上離してあるので、寄せた下着はどの服の下でも内側に収まる（立体的な飾りがスカートを突き抜けない）。
+		// 頂点は元の nif と共有なので、頂点の写しと頂点バッファを自前で作る（面・骨・重みの配列は元と共有）。
+		// 寄せる頂点が無ければ nullptr（a_why は空）。作れなければ nullptr と理由
+		RE::NiSkinPartition* MakeTuckedPartition(RE::NiSkinPartition* a_orig, float a_zOff, const std::vector<SkinPt>& a_skin, float a_limit, std::string& a_why,
+			int& a_moved, float& a_maxMove)
+		{
+			a_moved = 0;
+			a_maxMove = 0.0f;
+			auto rtti = a_orig->GetRTTI();
+			if (!rtti || !rtti->GetName() || std::string_view(rtti->GetName()) != "NiSkinPartition") {
+				a_why = "skinPartition の型が NiSkinPartition でない";
+				return nullptr;
+			}
+			auto dev = Device();
+			if (!dev) {
+				a_why = "D3D11 のデバイスが無い";
+				return nullptr;
+			}
+			const std::uint32_t np = a_orig->numPartitions;
+			const std::uint32_t nv = a_orig->vertexCount;
+			if (!np || a_orig->partitions.size() != np || !nv || a_skin.empty()) {
+				a_why = "区画・頂点・体の点が無い";
+				return nullptr;
+			}
+			auto b0 = a_orig->partitions[0].buffData;
+			if (!b0 || !b0->rawVertexData || !b0->vertexBuffer) {
+				a_why = "頂点のデータが無い";
+				return nullptr;
+			}
+			const auto            stride = b0->vertexDesc.GetSize();
+			std::set<const void*> bufs;
+			for (std::uint32_t i = 0; i < np; ++i) {
+				auto b = a_orig->partitions[i].buffData;
+				if (!b || !b->rawVertexData || !b->vertexBuffer || !b->indexBuffer || b->vertexDesc.GetSize() != stride) {
+					a_why = std::format("区画{} の頂点のデータが無い・作りが違う", i);
+					return nullptr;
+				}
+				D3D11_BUFFER_DESC vbd{};
+				reinterpret_cast<ID3D11Buffer*>(b->vertexBuffer)->GetDesc(&vbd);
+				if (vbd.ByteWidth != static_cast<UINT>(nv) * stride) {
+					a_why = std::format("区画{} の頂点バッファの大きさが頂点の数と合わない（{} バイト、頂点 {}）", i, vbd.ByteWidth, nv);
+					return nullptr;
+				}
+				bufs.insert(b);
+			}
+			if (bufs.size() != np) {
+				a_why = "区画どうしで buffData を共有している";
+				return nullptr;
+			}
+			// 寄せる量: 頂点ごとに、いちばん近い体の点の法線の向きのすき間 g が a_limit を超えた分だけ、法線の逆へ動かす
+			std::vector<std::array<float, 3>> moved(nv);
+			std::vector<char>                 hit(nv, 0);
+			for (std::uint32_t v = 0; v < nv; ++v) {
+				const float*  f = reinterpret_cast<const float*>(b0->rawVertexData + static_cast<std::size_t>(v) * stride);
+				const float   q[3] = { f[0], f[1], f[2] + a_zOff };
+				float         best = 1e30f;
+				const SkinPt* sb = nullptr;
+				// 体の点は z の順。q の高さから上下へ、z の差だけで今の最良より遠くなったら打ち切る
+				const auto start = std::lower_bound(a_skin.begin(), a_skin.end(), q[2], [](const SkinPt& a, float z) { return a.p[2] < z; }) - a_skin.begin();
+				auto       test = [&](std::ptrdiff_t k) {
+                    const auto& sp = a_skin[k];
+                    const float d = (sp.p[0] - q[0]) * (sp.p[0] - q[0]) + (sp.p[1] - q[1]) * (sp.p[1] - q[1]) + (sp.p[2] - q[2]) * (sp.p[2] - q[2]);
+                    if (d < best) {
+                        best = d;
+                        sb = &sp;
+                    }
+				};
+				for (std::ptrdiff_t k = start; k < static_cast<std::ptrdiff_t>(a_skin.size()); ++k) {
+					if ((a_skin[k].p[2] - q[2]) * (a_skin[k].p[2] - q[2]) >= best) {
+						break;
+					}
+					test(k);
+				}
+				for (std::ptrdiff_t k = start - 1; k >= 0; --k) {
+					if ((q[2] - a_skin[k].p[2]) * (q[2] - a_skin[k].p[2]) >= best) {
+						break;
+					}
+					test(k);
+				}
+				if (!sb || best > 36.0f) {
+					continue;  // 体から 6 より遠い（体の無い所）は動かさない
+				}
+				const float g = (q[0] - sb->p[0]) * sb->n[0] + (q[1] - sb->p[1]) * sb->n[1] + (q[2] - sb->p[2]) * sb->n[2];
+				if (g <= a_limit) {
+					continue;
+				}
+				const float m = g - a_limit;
+				moved[v] = { f[0] - sb->n[0] * m, f[1] - sb->n[1] * m, f[2] - sb->n[2] * m };
+				hit[v] = 1;
+				++a_moved;
+				a_maxMove = (std::max)(a_maxMove, m);
+			}
+			if (!a_moved) {
+				return nullptr;
+			}
+			// 頂点の写し（区画ごと）と頂点バッファ（区画で共有、元と同じ作り）
+			std::vector<std::uint8_t*> raws(np, nullptr);
+			for (std::uint32_t i = 0; i < np; ++i) {
+				raws[i] = static_cast<std::uint8_t*>(RE::malloc(static_cast<std::size_t>(nv) * stride));
+				if (!raws[i]) {
+					a_why = "メモリが取れない";
+					return nullptr;  // 取れた分はわずかなので捨てる（解放しない）
+				}
+				std::memcpy(raws[i], a_orig->partitions[i].buffData->rawVertexData, static_cast<std::size_t>(nv) * stride);
+				for (std::uint32_t v = 0; v < nv; ++v) {
+					if (hit[v]) {
+						std::memcpy(raws[i] + static_cast<std::size_t>(v) * stride, moved[v].data(), 12);
+					}
+				}
+			}
+			D3D11_BUFFER_DESC vbd{};
+			reinterpret_cast<ID3D11Buffer*>(b0->vertexBuffer)->GetDesc(&vbd);  // 元と同じ作り（大きさ・用途）
+			D3D11_SUBRESOURCE_DATA init{};
+			init.pSysMem = raws[0];
+			ID3D11Buffer* vb = nullptr;
+			const HRESULT hr = dev->CreateBuffer(&vbd, &init, &vb);
+			if (FAILED(hr) || !vb) {
+				a_why = std::format("頂点バッファを作れない（HRESULT {:08X}）", static_cast<std::uint32_t>(hr));
+				return nullptr;
+			}
+			auto head = static_cast<std::size_t*>(RE::malloc(sizeof(std::size_t) + sizeof(RE::NiSkinPartition::Partition) * np));
+			auto obj = RE::malloc(sizeof(RE::NiSkinPartition));
+			std::vector<RE::BSGraphics::TriShape*> tris(np, nullptr);
+			for (auto& t : tris) {
+				t = static_cast<RE::BSGraphics::TriShape*>(RE::malloc(sizeof(RE::BSGraphics::TriShape)));
+			}
+			if (!head || !obj || std::find(tris.begin(), tris.end(), nullptr) != tris.end()) {
+				vb->Release();
+				a_why = "メモリが取れない";
+				return nullptr;
+			}
+			*head = np;
+			auto parts = reinterpret_cast<RE::NiSkinPartition::Partition*>(head + 1);
+			for (std::uint32_t i = 0; i < np; ++i) {
+				const auto& src = a_orig->partitions[i];
+				std::memcpy(&parts[i], &src, sizeof(RE::NiSkinPartition::Partition));  // 骨・重みなどの配列は元と共有
+				std::memcpy(tris[i], src.buffData, sizeof(RE::BSGraphics::TriShape));   // 面は元と共有
+				tris[i]->refCount = 1;
+				tris[i]->rawVertexData = raws[i];
+				if (i) {
+					vb->AddRef();  // 区画ごとに参照を 1 つ持つ（手放さない）
+				}
+				tris[i]->vertexBuffer = reinterpret_cast<REX::W32::ID3D11Buffer*>(vb);
+				reinterpret_cast<ID3D11Buffer*>(tris[i]->indexBuffer)->AddRef();  // 共有の面のバッファ。参照を 1 つ持つ（手放さない）
+				parts[i].buffData = tris[i];
+			}
+			std::memcpy(obj, a_orig, sizeof(RE::NiSkinPartition));
+			auto mine = static_cast<RE::NiSkinPartition*>(obj);
+			*reinterpret_cast<std::uint32_t*>(reinterpret_cast<std::uint8_t*>(obj) + 0x08) = 0;  // NiRefObject::_refCount
+			*reinterpret_cast<RE::NiSkinPartition::Partition**>(&mine->partitions) = parts;
+			mine->IncRefCount();  // 余分の参照（決して手放さない。デストラクタが走らないように）
+			return mine;
+		}
+
 		// ファイル無しの帯を用意する（体 nif ごとに 1 回）。失敗したら nullptr（a_why に理由）
 		Fileless* GetFileless(const char* a_path, int a_zLo, int a_zHi, std::string& a_why)
 		{
@@ -645,6 +807,42 @@ namespace Band
 			Fileless f;
 			f.root = normal;
 			int kept = 0;
+			// 肌の体の点（腕・手は除く）。下着を体に寄せる基準。z の順に並べる（近い点を探すとき z で打ち切る）
+			std::vector<SkinPt> skinPts;
+			for (auto geo : shapes) {
+				auto skin = geo->GetGeometryRuntimeData().skinInstance.get();
+				auto sp = skin ? skin->skinPartition.get() : nullptr;
+				auto pr = geo->GetGeometryRuntimeData().shaderProperty.get();
+				if (!pr || !pr->material || pr->material->GetFeature() != RE::BSShaderMaterial::Feature::kFaceGenRGBTint || !sp || !sp->numPartitions) {
+					continue;
+				}
+				auto b = sp->partitions[0].buffData;
+				if (!b || !b->rawVertexData || !b->vertexDesc.HasFlag(RE::BSGraphics::Vertex::VF_NORMAL)) {
+					continue;
+				}
+				const auto stride = b->vertexDesc.GetSize();
+				const auto offN = b->vertexDesc.GetAttributeOffset(RE::BSGraphics::Vertex::VA_NORMAL);
+				const auto arm = ArmBones(skin);
+				const auto fo = FrameOffset(geo);
+				for (std::uint32_t v = 0; v < sp->vertexCount; ++v) {
+					const auto*  vp = b->rawVertexData + static_cast<std::size_t>(v) * stride;
+					const float* fp = reinterpret_cast<const float*>(vp);
+					const float  z = fp[2] + fo[2];
+					if (z < static_cast<float>(a_zLo) - 8.0f || z > static_cast<float>(a_zHi) + 8.0f || OnArm(vp, b->vertexDesc, sp->partitions[0], arm)) {
+						continue;
+					}
+					SkinPt pt{ { fp[0] + fo[0], fp[1] + fo[1], z }, { vp[offN] / 127.5f - 1.0f, vp[offN + 1] / 127.5f - 1.0f, vp[offN + 2] / 127.5f - 1.0f } };
+					const float l = std::sqrt(pt.n[0] * pt.n[0] + pt.n[1] * pt.n[1] + pt.n[2] * pt.n[2]);
+					if (l < 1e-3f) {
+						continue;
+					}
+					for (auto& c : pt.n) {
+						c /= l;
+					}
+					skinPts.push_back(pt);
+				}
+			}
+			std::sort(skinPts.begin(), skinPts.end(), [](const SkinPt& a, const SkinPt& b) { return a.p[2] < b.p[2]; });
 			for (auto geo : shapes) {
 				auto skin = geo->GetGeometryRuntimeData().skinInstance.get();
 				if (std::string why; !Layout::Check(skin, why)) {
@@ -675,7 +873,24 @@ namespace Band
 						continue;
 					}
 					if (hi <= a_zHi + 6) {
-						logger::info("  帯（ファイル無し）: [{}] 肌でない shape（z {:.1f}〜{:.1f}）は切らずにそのまま付ける", geo->name.c_str(), lo, hi);
+						// 体から外に出ている所（立体的な飾りなど）は体に寄せる。スカートはお尻のあたりで体から 1 以上離すので、0.4 ならどの服でも内側に収まる
+						std::string why;
+						int         moved = 0;
+						float       maxMove = 0.0f;
+						auto        tucked = MakeTuckedPartition(orig, FrameOffset(geo)[2], skinPts, 0.4f, why, moved, maxMove);
+						if (tucked) {
+							logger::info("  帯（ファイル無し）: [{}] 肌でない shape（z {:.1f}〜{:.1f}）は切らずに付ける。体から 0.4 より外の頂点 {} 個を体に寄せた（最大 {:.1f}）",
+								geo->name.c_str(), lo, hi, moved, maxMove);
+							orig->IncRefCount();  // 元の物も手放さない（自前の物と配列を共有しているので）
+							f.origs.emplace_back(orig);
+							f.mine.emplace_back(tucked);
+							f.skins.push_back(skin);
+							f.empty.push_back(0);
+							++kept;
+							continue;
+						}
+						logger::info("  帯（ファイル無し）: [{}] 肌でない shape（z {:.1f}〜{:.1f}）は切らずにそのまま付ける{}", geo->name.c_str(), lo, hi,
+							why.empty() ? std::string("（体から出ている所は無い）") : std::format("（体に寄せられない: {}）", why));
 						f.origs.emplace_back(nullptr);
 						f.mine.emplace_back(nullptr);
 						f.skins.push_back(skin);
