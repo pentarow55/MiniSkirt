@@ -643,8 +643,12 @@ namespace Band
 			}
 			const std::uint32_t np = a_orig->numPartitions;
 			const std::uint32_t nv = a_orig->vertexCount;
-			if (!np || a_orig->partitions.size() != np || !nv || a_skin.empty()) {
-				a_why = "区画・頂点・体の点が無い";
+			if (a_skin.empty()) {
+				a_why = "基準の肌の点が無い";
+				return nullptr;
+			}
+			if (!np || a_orig->partitions.size() != np || !nv) {
+				a_why = std::format("区画・頂点が無い（区画 {}・{}、頂点 {}）", np, a_orig->partitions.size(), nv);
 				return nullptr;
 			}
 			auto b0 = a_orig->partitions[0].buffData;
@@ -702,8 +706,8 @@ namespace Band
 					}
 					test(k);
 				}
-				if (!sb || best > 36.0f) {
-					continue;  // 体から 6 より遠い（体の無い所）は動かさない
+				if (!sb || best > 100.0f) {
+					continue;  // 体から 10 より遠い（体の無い所）は動かさない。お尻に掛かる布（アハラムの下着の Cloth）は 6 以上離れている
 				}
 				const float g = (q[0] - sb->p[0]) * sb->n[0] + (q[1] - sb->p[1]) * sb->n[1] + (q[2] - sb->p[2]) * sb->n[2];
 				if (g <= a_limit) {
@@ -817,29 +821,80 @@ namespace Band
 					continue;
 				}
 				auto b = sp->partitions[0].buffData;
-				if (!b || !b->rawVertexData || !b->vertexDesc.HasFlag(RE::BSGraphics::Vertex::VF_NORMAL)) {
+				if (!b || !b->rawVertexData) {
 					continue;
 				}
-				const auto stride = b->vertexDesc.GetSize();
-				const auto offN = b->vertexDesc.GetAttributeOffset(RE::BSGraphics::Vertex::VA_NORMAL);
+				// 法線は三角形から求める（体はモデル空間の法線マップを使うので、頂点に法線が無いことが多い）
+				const auto           stride = b->vertexDesc.GetSize();
+				const auto           nv = sp->vertexCount;
+				auto                 at = [&](std::uint32_t v) { return reinterpret_cast<const float*>(b->rawVertexData + static_cast<std::size_t>(v) * stride); };
+				std::vector<float>   acc(static_cast<std::size_t>(nv) * 3, 0.0f);
+				for (std::uint32_t i = 0; i < sp->numPartitions; ++i) {
+					auto pb = sp->partitions[i].buffData;
+					if (!pb || !pb->rawIndexData) {
+						continue;
+					}
+					const auto* ix = pb->rawIndexData;
+					for (std::uint32_t t = 0; t < sp->partitions[i].triangles; ++t) {
+						const std::uint16_t a = ix[t * 3], c1 = ix[t * 3 + 1], c2 = ix[t * 3 + 2];
+						if (a >= nv || c1 >= nv || c2 >= nv || (a == c1 && c1 == c2)) {
+							continue;
+						}
+						const float* pa = at(a);
+						const float* pb1 = at(c1);
+						const float* pc = at(c2);
+						const float  u[3] = { pb1[0] - pa[0], pb1[1] - pa[1], pb1[2] - pa[2] };
+						const float  w[3] = { pc[0] - pa[0], pc[1] - pa[1], pc[2] - pa[2] };
+						const float  fn[3] = { u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0] };
+						for (auto v : { a, c1, c2 }) {
+							for (int k = 0; k < 3; ++k) {
+								acc[static_cast<std::size_t>(v) * 3 + k] += fn[k];
+							}
+						}
+					}
+				}
 				const auto arm = ArmBones(skin);
 				const auto fo = FrameOffset(geo);
-				for (std::uint32_t v = 0; v < sp->vertexCount; ++v) {
+				const auto first = skinPts.size();
+				float      cx = 0.0f, cy = 0.0f;
+				for (std::uint32_t v = 0; v < nv; ++v) {
 					const auto*  vp = b->rawVertexData + static_cast<std::size_t>(v) * stride;
 					const float* fp = reinterpret_cast<const float*>(vp);
 					const float  z = fp[2] + fo[2];
 					if (z < static_cast<float>(a_zLo) - 8.0f || z > static_cast<float>(a_zHi) + 8.0f || OnArm(vp, b->vertexDesc, sp->partitions[0], arm)) {
 						continue;
 					}
-					SkinPt pt{ { fp[0] + fo[0], fp[1] + fo[1], z }, { vp[offN] / 127.5f - 1.0f, vp[offN + 1] / 127.5f - 1.0f, vp[offN + 2] / 127.5f - 1.0f } };
-					const float l = std::sqrt(pt.n[0] * pt.n[0] + pt.n[1] * pt.n[1] + pt.n[2] * pt.n[2]);
-					if (l < 1e-3f) {
+					const float* n = &acc[static_cast<std::size_t>(v) * 3];
+					const float  l = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+					if (l < 1e-8f) {
 						continue;
 					}
-					for (auto& c : pt.n) {
-						c /= l;
+					skinPts.push_back({ { fp[0] + fo[0], fp[1] + fo[1], z }, { n[0] / l, n[1] / l, n[2] / l } });
+					cx += fp[0] + fo[0];
+					cy += fp[1] + fo[1];
+				}
+				// 三角形の向き（表裏）は nif 次第なので、法線が体の外を向く頂点が多くなる向きにそろえる（腰まわりで数える）
+				const auto cnt = skinPts.size() - first;
+				if (cnt) {
+					cx /= cnt;
+					cy /= cnt;
+					int out = 0, in = 0;
+					for (auto k = first; k < skinPts.size(); ++k) {
+						auto& pt = skinPts[k];
+						if (pt.p[2] < 60.0f || pt.p[2] > 80.0f) {
+							continue;
+						}
+						((pt.p[0] - cx) * pt.n[0] + (pt.p[1] - cy) * pt.n[1] > 0.0f ? out : in)++;
 					}
-					skinPts.push_back(pt);
+					if (in > out) {
+						for (auto k = first; k < skinPts.size(); ++k) {
+							for (auto& c : skinPts[k].n) {
+								c = -c;
+							}
+						}
+					}
+					logger::info("  帯（ファイル無し）: [{}] 下着を寄せる基準の肌の点 {} 個（法線は三角形から。外向き {}・内向き {}{}）", geo->name.c_str(), cnt, out, in,
+						in > out ? "、裏返した" : "");
 				}
 			}
 			std::sort(skinPts.begin(), skinPts.end(), [](const SkinPt& a, const SkinPt& b) { return a.p[2] < b.p[2]; });
@@ -920,6 +975,18 @@ namespace Band
 				}
 				logger::info("  帯（ファイル無し）: [{}] {}区画 {} 個、三角 {} 個のうち {} 個を消した（うち範囲の中の腕・手首 {} 個）", geo->name.c_str(),
 					isSkin ? "" : std::format("肌でない shape（z {:.1f}〜{:.1f}）を範囲で切った。", lo, hi), orig->numPartitions, total, removed, armCut);
+				if (!isSkin) {
+					// 切った下着（飾りなど）も、体から外に出ている所は体に寄せる
+					std::string twhy;
+					int         moved = 0;
+					float       maxMove = 0.0f;
+					if (auto tucked = MakeTuckedPartition(mine, FrameOffset(geo)[2], skinPts, 0.4f, twhy, moved, maxMove)) {
+						logger::info("  帯（ファイル無し）: [{}] 体から 0.4 より外の頂点 {} 個を体に寄せた（最大 {:.1f}）", geo->name.c_str(), moved, maxMove);
+						mine = tucked;
+					} else if (!twhy.empty()) {
+						logger::info("  帯（ファイル無し）: [{}] 体に寄せられない（{}）", geo->name.c_str(), twhy);
+					}
+				}
 				orig->IncRefCount();  // 元の物も手放さない（自前の物と配列を共有しているので）
 				f.origs.emplace_back(orig);
 				f.mine.emplace_back(mine);
