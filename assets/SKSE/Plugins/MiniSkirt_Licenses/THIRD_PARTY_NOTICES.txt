@@ -9,7 +9,7 @@ version. See COPYING.txt in this folder for the full text.
 MiniSkirt is built on CommonLibSSE NG, which is licensed under
 GPL-3.0-or-later WITH the Modding Exception and the GPL-3.0 Linking Exception
 (with Corresponding Source). The source code of MiniSkirt is available at:
-  (source URL to be filled in before release)
+  https://github.com/pentarow55/MiniSkirt
 
 MiniSkirt.dll contains code from the libraries listed below. Their copyright
 notices and license terms follow.
