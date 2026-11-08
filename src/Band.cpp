@@ -1532,6 +1532,7 @@ namespace Band
 			Skirt::Vec3 n;
 			float       butt[4]{};  // 見つけたお尻の揺れ骨（最大 4 本）ごとの重み
 			std::array<std::pair<RE::NiAVObject*, float>, 4> all{};  // 全部の骨の重み（C で写す）
+			bool        skin = true;  // 肌の shape の頂点。下着など肌でない物は、すき間を空けず覆うだけにする
 		};
 
 	}
@@ -1901,8 +1902,10 @@ namespace Band
 		}
 		const auto  t0 = std::chrono::steady_clock::now();
 		const float top = static_cast<float>(it->second.zHi);
-		// 帯の体: 描く三角形の頂点（腕・手首・上端より上は切ってある）と、腕・手の頂点（袖の見分け用）
-		std::vector<Skirt::Vec3> band, arm;
+		// 帯の体: 描く三角形の頂点（腕・手首・上端より上は切ってある）と、腕・手の頂点（袖の見分け用）。
+		// 下着など肌でない shape は使わない（飾りが体より外に出ていて、お尻の線が横に広がった）。肌の shape が無いときだけ使う。
+		// 下着の突き抜けは FitSkirt の押し出しが全部の shape で防ぐ
+		std::vector<Skirt::Vec3> band, arm, other;
 		for (auto& s : it->second.shapes) {
 			auto geo = s ? s->AsGeometry() : nullptr;
 			auto skin = geo ? geo->GetGeometryRuntimeData().skinInstance.get() : nullptr;
@@ -1910,6 +1913,9 @@ namespace Band
 			if (!part || !part->numPartitions || !part->partitions[0].buffData || !part->partitions[0].buffData->rawVertexData) {
 				continue;
 			}
+			auto       pr = geo->GetGeometryRuntimeData().shaderProperty.get();
+			const bool isSkin = pr && pr->material && pr->material->GetFeature() == RE::BSShaderMaterial::Feature::kFaceGenRGBTint;
+			auto&      dst = isSkin ? band : other;
 			auto             b = part->partitions[0].buffData;
 			const auto       stride = b->vertexDesc.GetSize();
 			const auto       nv = part->vertexCount;
@@ -1938,11 +1944,14 @@ namespace Band
 				const auto*  vp = b->rawVertexData + static_cast<std::size_t>(v) * stride;
 				const float* f = reinterpret_cast<const float*>(vp);
 				if (drawn[v]) {
-					band.push_back({ f[0] + bandFo[0], f[1] + bandFo[1], f[2] + bandFo[2] });
+					dst.push_back({ f[0] + bandFo[0], f[1] + bandFo[1], f[2] + bandFo[2] });
 				} else if (partOf[v] >= 0 && ArmWeight(vp, b->vertexDesc, part->partitions[partOf[v]], armBones) >= 0.5f) {
 					arm.push_back({ f[0] + bandFo[0], f[1] + bandFo[1], f[2] + bandFo[2] });
 				}
 			}
+		}
+		if (band.empty()) {
+			band.swap(other);
 		}
 		const auto tBand = std::chrono::steady_clock::now();
 		long long  usSleeve = 0;
@@ -2056,6 +2065,7 @@ namespace Band
 			Skirt::Vec3                                    p, n;
 			std::vector<std::pair<RE::NiAVObject*, float>> leaf;
 			std::vector<std::pair<RE::NiAVObject*, float>> all;  // 全部の骨
+			bool                                           skin = true;
 		};
 		std::vector<Raw> raws;
 		for (auto& s : it->second.shapes) {
@@ -2069,6 +2079,8 @@ namespace Band
 			if (!b || !b->rawVertexData) {
 				continue;
 			}
+			auto       pr = geo->GetGeometryRuntimeData().shaderProperty.get();
+			const bool isSkin = pr && pr->material && pr->material->GetFeature() == RE::BSShaderMaterial::Feature::kFaceGenRGBTint;
 			auto       desc = b->vertexDesc;
 			const auto stride = desc.GetSize();
 			const bool hasN = desc.HasFlag(RE::BSGraphics::Vertex::VF_NORMAL);
@@ -2104,6 +2116,7 @@ namespace Band
 					continue;
 				}
 				Raw r;
+				r.skin = isSkin;
 				r.p = { f[0] + bandFo[0], f[1] + bandFo[1], f[2] + bandFo[2] };
 				r.n = { 0.0f, 0.0f, 0.0f };
 				if (hasN) {
@@ -2197,6 +2210,7 @@ namespace Band
 			BandVert bv;
 			bv.p = r.p;
 			bv.n = r.n;
+			bv.skin = r.skin;
 			for (std::size_t k = 0; k < r.all.size() && k < bv.all.size(); ++k) {
 				bv.all[k] = r.all[k];
 			}
@@ -2343,7 +2357,11 @@ namespace Band
 					++dgEval;
 					dgMinGap = (std::min)(dgMinGap, g);
 					dgInside += g < 0.0f;
-					const float want = t1 > t0 ? gapW * (std::clamp)((t1 - q.z) / (t1 - t0), 0.0f, 1.0f) : gapW;
+					float want = t1 > t0 ? gapW * (std::clamp)((t1 - q.z) / (t1 - t0), 0.0f, 1.0f) : gapW;
+					if (!b->skin) {
+						// 下着（肌でない shape）は突き抜けない程度に覆うだけ。体と同じに離すと、飾りの所でスカートが横に膨らんだ（オルフィナ）
+						want = (std::min)(want, 0.3f);
+					}
 					push[v] = (std::clamp)(want - g, 0.0f, gapW + 3.0f) * (1.0f - sl);
 				}
 				// 押し出し量を隣へ 0.6 倍ずつ広げる（大きいほうを取る）。段差・しわを防ぐ
