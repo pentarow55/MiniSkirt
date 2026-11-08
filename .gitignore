@@ -1,0 +1,17 @@
+# Private notes and tools (not published). See CLAUDE.md.
+dev/
+# This PC only
+local.ps1
+CMakeUserPresets.json
+.claude/
+.trash/
+# Build outputs
+build/
+build-multi/
+build-release/
+dist/
+espgen/bin/
+espgen/obj/
+__pycache__/
+*.user
+.vs/

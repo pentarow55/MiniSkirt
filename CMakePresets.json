@@ -1,0 +1,43 @@
+{
+	"version": 6,
+	"configurePresets": [
+		{
+			"name": "vr",
+			"generator": "Ninja",
+			"binaryDir": "${sourceDir}/build",
+			"toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "RelWithDebInfo",
+				"VCPKG_TARGET_TRIPLET": "x64-windows-static-md"
+			}
+		},
+		{
+			"name": "multi",
+			"generator": "Ninja",
+			"binaryDir": "${sourceDir}/build-multi",
+			"toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "RelWithDebInfo",
+				"VCPKG_TARGET_TRIPLET": "x64-windows-static-md",
+				"MINISKIRT_MULTI": "ON"
+			}
+		},
+		{
+			"name": "release",
+			"generator": "Ninja",
+			"binaryDir": "${sourceDir}/build-release",
+			"toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "RelWithDebInfo",
+				"VCPKG_TARGET_TRIPLET": "x64-windows-static-md",
+				"MINISKIRT_MULTI": "ON",
+				"MINISKIRT_DEVTOOLS": "OFF"
+			}
+		}
+	],
+	"buildPresets": [
+		{ "name": "vr", "configurePreset": "vr" },
+		{ "name": "multi", "configurePreset": "multi" },
+		{ "name": "release", "configurePreset": "release" }
+	]
+}
