@@ -10,6 +10,8 @@
 //   @freeze <0|1>                        自由カメラに入り直して、時間を止める／動かす（tfc 1 と同じ）
 //   @where <参照の FormID(16進)|player|cam>  位置と向きを結果ファイルに書く（構図を決める用）
 //   @actors                              近くの NPC の参照・位置・性別・名前を結果ファイルに書く
+//   @place <参照> <x> <y> <z> <向き(度)>  参照を同じセルの中の位置に置き、向きを決める
+//   @npc <名前の一部>                     表示名で NPC のベースを探し、ベースの FormID・性別・名前を書く
 //   @done <目印>                         結果ファイルに目印を書く（呼び出し側が終わりを待つ用）
 //   上記以外の行                          プレイヤーを対象にコンソールコマンドを実行する
 // 結果は MiniSkirt_cmd_result.txt に追記する。
@@ -173,6 +175,39 @@ namespace DebugCmd
 						const auto p = a->GetPosition();
 						auto       base = a->GetActorBase();
 						Result(std::format("actor {:08X} {:.0f} {:.0f} {:.0f} {} {}", a->GetFormID(), p.x, p.y, p.z, base && base->IsFemale() ? 1 : 0, a->GetName()));
+					}
+				}
+			} else if (a_line.rfind("@place ", 0) == 0) {
+				// 参照を同じセルの中の位置に置き、向き（度。0 で北・時計回り）を決める
+				std::istringstream ss(a_line.substr(7));
+				std::string        hex;
+				float              x, y, z, deg;
+				if (!(ss >> hex >> x >> y >> z >> deg)) {
+					Result("place-failed args");
+					return;
+				}
+				auto ref = RE::TESForm::LookupByID<RE::TESObjectREFR>(static_cast<RE::FormID>(std::stoul(hex, nullptr, 16)));
+				if (!ref) {
+					Result("place-failed " + hex);
+					return;
+				}
+				const float rad = deg * 3.14159265f / 180.0f;
+				ref->SetPosition(RE::NiPoint3{ x, y, z });
+				if (auto actor = ref->As<RE::Actor>()) {
+					actor->SetHeading(rad);
+				} else {
+					ref->SetAngle(RE::NiPoint3{ 0.0f, 0.0f, rad });
+				}
+				Result(std::format("place {} {} {} {} {}", hex, x, y, z, deg));
+			} else if (a_line.rfind("@npc ", 0) == 0) {
+				// 名前（ゲームの表示名の一部）で NPC のベースを探し、「npc ベース 女性 名前」で書く（@spawn で出す用）
+				const auto key = a_line.substr(5);
+				if (auto dh = RE::TESDataHandler::GetSingleton()) {
+					for (auto npc : dh->GetFormArray<RE::TESNPC>()) {
+						const char* n = npc ? npc->GetName() : nullptr;
+						if (n && std::string_view(n).find(key) != std::string_view::npos) {
+							Result(std::format("npc {:08X} {} {}", npc->GetFormID(), npc->IsFemale() ? 1 : 0, n));
+						}
 					}
 				}
 			} else if (a_line.rfind("@done ", 0) == 0) {
