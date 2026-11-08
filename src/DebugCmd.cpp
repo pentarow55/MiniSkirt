@@ -7,8 +7,9 @@
 //   @cam <x> <y> <z> <pitch> <yaw>       自由カメラにして、位置（ワールド座標）と向き（度。pitch は正で下向き、yaw は 0 で北・時計回り）を決める（SE/AE だけ）
 //   @camoff                              自由カメラをやめる
 //   @fov <度>                            視野角
-//   @freeze <0|1>                        時間を止める／動かす（描画は続く）
+//   @freeze <0|1>                        自由カメラに入り直して、時間を止める／動かす（tfc 1 と同じ）
 //   @where <参照の FormID(16進)|player|cam>  位置と向きを結果ファイルに書く（構図を決める用）
+//   @actors                              近くの NPC の参照・位置・性別・名前を結果ファイルに書く
 //   @done <目印>                         結果ファイルに目印を書く（呼び出し側が終わりを待つ用）
 //   上記以外の行                          プレイヤーを対象にコンソールコマンドを実行する
 // 結果は MiniSkirt_cmd_result.txt に追記する。
@@ -129,9 +130,15 @@ namespace DebugCmd
 					camera->GetRuntimeData2().worldFOV = std::stof(a_line.substr(5));
 				}
 			} else if (a_line.rfind("@freeze ", 0) == 0) {
-				if (auto main = RE::Main::GetSingleton()) {
-					main->GetRuntimeData().freezeTime = a_line.substr(8) != "0";
+				// 自由カメラに入り直して時間停止を切り替える（コンソールの tfc 1 と同じ。Main の値を直接書くと 1.7.104 では描画まで止まった）
+				auto camera = RE::PlayerCamera::GetSingleton();
+				if (!camera || REL::Module::IsVR()) {
+					return;
 				}
+				if (camera->IsInFreeCameraMode()) {
+					camera->ToggleFreeCameraMode(false);
+				}
+				camera->ToggleFreeCameraMode(a_line.substr(8) != "0");
 			} else if (a_line.rfind("@where ", 0) == 0) {
 				const auto arg = a_line.substr(7);
 				if (arg == "cam") {
@@ -144,9 +151,7 @@ namespace DebugCmd
 								idx = i;
 							}
 						}
-						auto main = RE::Main::GetSingleton();
-						Result(std::format("where cam {:.1f} {:.1f} {:.1f} state={} free={} freeze={}", t.x, t.y, t.z, idx, camera->IsInFreeCameraMode(),
-							main ? main->GetRuntimeData().freezeTime : false));
+						Result(std::format("where cam {:.1f} {:.1f} {:.1f} state={} free={}", t.x, t.y, t.z, idx, camera->IsInFreeCameraMode()));
 					}
 					return;
 				}
@@ -157,6 +162,19 @@ namespace DebugCmd
 				}
 				const auto p = ref->GetPosition();
 				Result(std::format("where {} {:.1f} {:.1f} {:.1f} {:.1f}", arg, p.x, p.y, p.z, ref->GetAngleZ() * 180.0f / 3.14159265f));
+			} else if (a_line == "@actors") {
+				// 読み込み済みの NPC（プレイヤー以外）を「actor 参照 x y z 女性 名前」で書く（下見で人の集まる所を探す用）
+				if (auto pl = RE::ProcessLists::GetSingleton()) {
+					for (auto& h : pl->highActorHandles) {
+						auto a = h.get();
+						if (!a || a->IsDead()) {
+							continue;
+						}
+						const auto p = a->GetPosition();
+						auto       base = a->GetActorBase();
+						Result(std::format("actor {:08X} {:.0f} {:.0f} {:.0f} {} {}", a->GetFormID(), p.x, p.y, p.z, base && base->IsFemale() ? 1 : 0, a->GetName()));
+					}
+				}
 			} else if (a_line.rfind("@done ", 0) == 0) {
 				Result("done " + a_line.substr(6));
 			} else if (!a_line.empty()) {
