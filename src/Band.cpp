@@ -1035,7 +1035,7 @@ namespace Band
 	}
 	namespace
 	{
-		int g_zHi = 80;  // 帯の上端（全 NPC 共通。ファイルを増やさないため）。下端はいつも 0（足首から）
+		int g_zHi = 75;  // 帯の上端（全 NPC 共通。ファイルを増やさないため）。下端はいつも 0（足首から）
 
 		// 服装（または段階リスト）に、体スロットの衣服（鎧でない）が入っているか
 		bool HasClothingForm(RE::TESForm* a_form, int a_depth)

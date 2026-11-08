@@ -37,7 +37,7 @@ namespace Probe
 			float hem{ 65.0f };            // 縮めたあとのすその高さ（足元 0・頭のてっぺん ≒ 128）。lengthCm から求める
 			float hipEase{ 1.0f };         // A ライン: お尻まわりのゆとり（帯の体のいちばん外からの幅）
 			float flareAngle{ 5.0f };      // A ライン: お尻の線より下の広がり角度（度。0 でまっすぐ下）
-			float bandTop{ 80.0f };      // 帯（足首から）の上端。全 NPC 共通（体 nif ごとにファイル 1 個）
+			float bandTop{ 75.0f };      // 帯（足首から）の上端。全 NPC 共通（体 nif ごとにファイル 1 個）
 			bool  remapWeights{ true };  // 縮めた頂点の骨の重みを、動かした先の高さの重みに写し替える
 			float skirtGap{ 1.0f };        // スカートを帯の体から離す幅（スカートにお尻の揺れ骨があるとき）
 			float skirtGapNoBone{ 1.0f };  // 同（お尻の揺れ骨が無く、お尻の揺れに追従できないとき）
