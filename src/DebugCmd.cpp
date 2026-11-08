@@ -12,6 +12,8 @@
 //   @actors                              近くの NPC の参照・位置・性別・名前を結果ファイルに書く
 //   @place <参照> <x> <y> <z> <向き(度)>  参照を同じセルの中の位置に置き、向きを決める
 //   @npc <名前の一部>                     表示名で NPC のベースを探し、ベースの FormID・性別・名前を書く
+//   @furn <参照|player> [半径]            まわりの家具の参照・位置・名前を結果ファイルに書く
+//   @ray <x1> <y1> <z1> <x2> <y2> <z2>  2 点の間を遮る物があるか、当たるまでの割合を書く（1 で見通せる）
 //   @done <目印>                         結果ファイルに目印を書く（呼び出し側が終わりを待つ用）
 //   上記以外の行                          プレイヤーを対象にコンソールコマンドを実行する
 // 結果は MiniSkirt_cmd_result.txt に追記する。
@@ -210,6 +212,48 @@ namespace DebugCmd
 						}
 					}
 				}
+			} else if (a_line.rfind("@furn ", 0) == 0) {
+				// 参照のまわり（半径）にある家具を「furn 参照 x y z 名前」で書く（NPC に使わせる金床・椅子などを探す用）
+				std::istringstream ss(a_line.substr(6));
+				std::string        hex;
+				float              radius = 500.0f;
+				ss >> hex >> radius;
+				auto origin = hex == "player" ? player : RE::TESForm::LookupByID<RE::TESObjectREFR>(static_cast<RE::FormID>(std::stoul(hex, nullptr, 16)));
+				auto tes = RE::TES::GetSingleton();
+				if (!origin || !tes) {
+					Result("furn-failed " + hex);
+					return;
+				}
+				tes->ForEachReferenceInRange(origin, radius, [](RE::TESObjectREFR* a_ref) {
+					auto base = a_ref ? a_ref->GetBaseObject() : nullptr;
+					if (base && base->Is(RE::FormType::Furniture)) {
+						const auto p = a_ref->GetPosition();
+						const char* n = base->GetName();
+						Result(std::format("furn {:08X} {:.0f} {:.0f} {:.0f} {}", a_ref->GetFormID(), p.x, p.y, p.z, n && *n ? n : base->GetFormEditorID()));
+					}
+					return RE::BSContainer::ForEachResult::kContinue;
+				});
+			} else if (a_line.rfind("@ray ", 0) == 0) {
+				// 2 点の間に壁や物があるか（視線の当たり判定）。「ray <当たるまでの割合>」を書く（1 で何も無い）
+				std::istringstream ss(a_line.substr(5));
+				RE::NiPoint3       a, b;
+				if (!(ss >> a.x >> a.y >> a.z >> b.x >> b.y >> b.z)) {
+					Result("ray-failed args");
+					return;
+				}
+				auto cell = player->GetParentCell();
+				auto world = cell ? cell->GetbhkWorld() : nullptr;
+				if (!world) {
+					Result("ray-failed world");
+					return;
+				}
+				const float    s = RE::bhkWorld::GetWorldScale();
+				RE::bhkPickData pick;
+				pick.rayInput.from = RE::hkVector4(a.x * s, a.y * s, a.z * s, 0.0f);
+				pick.rayInput.to = RE::hkVector4(b.x * s, b.y * s, b.z * s, 0.0f);
+				pick.rayInput.filterInfo.SetCollisionLayer(RE::COL_LAYER::kLOS);
+				world->PickObject(pick);
+				Result(std::format("ray {:.3f}", pick.rayOutput.HasHit() ? pick.rayOutput.hitFraction : 1.0f));
 			} else if (a_line.rfind("@done ", 0) == 0) {
 				Result("done " + a_line.substr(6));
 			} else if (!a_line.empty()) {
