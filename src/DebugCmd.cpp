@@ -3,6 +3,12 @@
 //   @spawn <ベースの FormID(16進)>      プレイヤーの足元に出す。出した参照の FormID を結果ファイルに書く
 //   @on <参照の FormID(16進)> <コマンド>  その参照を対象にコンソールコマンドを実行する（例: @on FF000D95 moveto player 0 400 0）
 //   @enabled <0|1>                       MiniSkirt の有効／無効を切り替え、読み込み済みの NPC を作り直す
+//   @hem <cm>                            スカート丈を上書きする（MCM と同じ値。0 で上書きをやめる）
+//   @cam <x> <y> <z> <pitch> <yaw>       自由カメラにして、位置（ワールド座標）と向き（度。pitch は正で下向き、yaw は 0 で北・時計回り）を決める（SE/AE だけ）
+//   @camoff                              自由カメラをやめる
+//   @fov <度>                            視野角
+//   @freeze <0|1>                        時間を止める／動かす（描画は続く）
+//   @where <参照の FormID(16進)|player|cam>  位置と向きを結果ファイルに書く（構図を決める用）
 //   @done <目印>                         結果ファイルに目印を書く（呼び出し側が終わりを待つ用）
 //   上記以外の行                          プレイヤーを対象にコンソールコマンドを実行する
 // 結果は MiniSkirt_cmd_result.txt に追記する。
@@ -86,6 +92,71 @@ namespace DebugCmd
 				// スカート丈（cm、MCM と同じ値。16〜55）。「@hem 0」で上書きをやめる
 				Probe::DebugSetLength(std::stof(a_line.substr(5)));
 				Result("hem " + a_line.substr(5));
+			} else if (a_line.rfind("@cam ", 0) == 0 || a_line == "@camoff") {
+				auto camera = RE::PlayerCamera::GetSingleton();
+				if (!camera || REL::Module::IsVR()) {
+					Result("cam-failed");
+					return;
+				}
+				if (a_line == "@camoff") {
+					if (camera->IsInFreeCameraMode()) {
+						camera->ToggleFreeCameraMode(false);
+					}
+					Result("camoff");
+					return;
+				}
+				std::istringstream ss(a_line.substr(5));
+				float              x, y, z, pitch, yaw;
+				if (!(ss >> x >> y >> z >> pitch >> yaw)) {
+					Result("cam-failed args");
+					return;
+				}
+				if (!camera->IsInFreeCameraMode()) {
+					camera->ToggleFreeCameraMode(false);
+				}
+				auto state = static_cast<RE::FreeCameraState*>(camera->GetRuntimeData().cameraStates[RE::CameraState::kFree].get());
+				if (!state) {
+					Result("cam-failed state");
+					return;
+				}
+				constexpr float kRad = 3.14159265f / 180.0f;
+				state->translation = { x, y, z };
+				state->rotation.x = pitch * kRad;
+				state->rotation.y = yaw * kRad;
+				Result(std::format("cam {} {} {} {} {}", x, y, z, pitch, yaw));
+			} else if (a_line.rfind("@fov ", 0) == 0) {
+				if (auto camera = RE::PlayerCamera::GetSingleton()) {
+					camera->GetRuntimeData2().worldFOV = std::stof(a_line.substr(5));
+				}
+			} else if (a_line.rfind("@freeze ", 0) == 0) {
+				if (auto main = RE::Main::GetSingleton()) {
+					main->GetRuntimeData().freezeTime = a_line.substr(8) != "0";
+				}
+			} else if (a_line.rfind("@where ", 0) == 0) {
+				const auto arg = a_line.substr(7);
+				if (arg == "cam") {
+					auto camera = RE::PlayerCamera::GetSingleton();
+					if (camera && camera->cameraRoot) {
+						const auto& t = camera->cameraRoot->world.translate;
+						int         idx = -1;
+						for (int i = 0; i < RE::CameraState::kTotal; ++i) {
+							if (camera->currentState && camera->currentState == camera->GetRuntimeData().cameraStates[i]) {
+								idx = i;
+							}
+						}
+						auto main = RE::Main::GetSingleton();
+						Result(std::format("where cam {:.1f} {:.1f} {:.1f} state={} free={} freeze={}", t.x, t.y, t.z, idx, camera->IsInFreeCameraMode(),
+							main ? main->GetRuntimeData().freezeTime : false));
+					}
+					return;
+				}
+				RE::TESObjectREFR* ref = arg == "player" ? player : RE::TESForm::LookupByID<RE::TESObjectREFR>(static_cast<RE::FormID>(std::stoul(arg, nullptr, 16)));
+				if (!ref) {
+					Result("where-failed " + arg);
+					return;
+				}
+				const auto p = ref->GetPosition();
+				Result(std::format("where {} {:.1f} {:.1f} {:.1f} {:.1f}", arg, p.x, p.y, p.z, ref->GetAngleZ() * 180.0f / 3.14159265f));
 			} else if (a_line.rfind("@done ", 0) == 0) {
 				Result("done " + a_line.substr(6));
 			} else if (!a_line.empty()) {
