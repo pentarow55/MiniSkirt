@@ -18,6 +18,7 @@
 namespace Probe
 {
 	void DebugSetEnabled(bool a_on);
+	void DebugSetLength(float a_cm);
 }
 
 namespace DebugCmd
@@ -81,6 +82,10 @@ namespace DebugCmd
 				RunScript(rest, ref);
 			} else if (a_line.rfind("@enabled ", 0) == 0) {
 				Probe::DebugSetEnabled(a_line.substr(9) != "0");
+			} else if (a_line.rfind("@hem ", 0) == 0) {
+				// スカート丈（cm、MCM と同じ値。16〜55）。「@hem 0」で上書きをやめる
+				Probe::DebugSetLength(std::stof(a_line.substr(5)));
+				Result("hem " + a_line.substr(5));
 			} else if (a_line.rfind("@done ", 0) == 0) {
 				Result("done " + a_line.substr(6));
 			} else if (!a_line.empty()) {

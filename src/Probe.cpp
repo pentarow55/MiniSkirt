@@ -1114,6 +1114,9 @@ namespace Probe
 		}
 
 		int g_dbgEnabled = -1;  // 開発用（DebugCmd の @enabled）。0/1 なら設定ファイルの「有効」を上書きする
+#ifdef MINISKIRT_DEVTOOLS
+		float g_dbgLengthCm = -1;  // 開発用（DebugCmd の @hem）。0 より大きければ設定ファイルの「スカート丈」を上書きする
+#endif
 
 		// ゲーム中に設定を変えた（MCM を閉じた）: 設定を読み直し、読み込まれている対象の NPC 全員を元から作り直す
 		void ApplySettings()
@@ -1124,6 +1127,12 @@ namespace Probe
 			if (g_dbgEnabled >= 0) {
 				g_cfg.enabled = g_dbgEnabled != 0;
 			}
+#ifdef MINISKIRT_DEVTOOLS
+			if (g_dbgLengthCm > 0) {
+				g_cfg.lengthCm = (std::clamp)(g_dbgLengthCm, kLengthMinCm, kLengthMaxCm);
+				g_cfg.hem = HemFromLength(g_cfg.lengthCm);
+			}
+#endif
 			const bool topChanged = std::lround(old.bandTop) != std::lround(g_cfg.bandTop);
 			const bool changed = topChanged || old.enabled != g_cfg.enabled || old.hem != g_cfg.hem || old.hipEase != g_cfg.hipEase || old.flareAngle != g_cfg.flareAngle ||
 			                     old.skirtGap != g_cfg.skirtGap || old.skirtGapNoBone != g_cfg.skirtGapNoBone || old.waist != g_cfg.waist ||
@@ -1294,6 +1303,20 @@ namespace Probe
 		g_dbgEnabled = a_on ? 1 : 0;
 		ApplySettings();
 	}
+
+#ifdef MINISKIRT_DEVTOOLS
+	// 開発用: スカート丈（cm、MCM と同じ値）を上書きして全員を作り直す。0 以下で上書きをやめ、設定ファイルの値に戻す
+	void DebugSetLength(float a_cm)
+	{
+		g_dbgLengthCm = a_cm;
+		if (a_cm > 0) {
+			logger::info("デバッグコマンド: スカート丈を {:.0f} cm に上書き（範囲 {:.0f}〜{:.0f} に収める）", a_cm, kLengthMinCm, kLengthMaxCm);
+		} else {
+			logger::info("デバッグコマンド: スカート丈の上書きをやめ、設定ファイルの値に戻す");
+		}
+		ApplySettings();
+	}
+#endif
 
 	// プラグイン読み込み時（ゲームの初期化より前）: 設定を読み、帯ファイルを先に書き出す
 	void Early()
