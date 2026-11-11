@@ -4,6 +4,7 @@
 //   @on <参照の FormID(16進)> <コマンド>  その参照を対象にコンソールコマンドを実行する（例: @on FF000D95 moveto player 0 400 0）
 //   @enabled <0|1>                       MiniSkirt の有効／無効を切り替え、読み込み済みの NPC を作り直す
 //   @hem <cm>                            スカート丈を上書きする（MCM と同じ値。0 で上書きをやめる）
+//   @flag <番号> <0|1>                   開発用の切り替え（DevFlags.h）。不具合の切り分けで処理の一部を変える
 //   @cam <x> <y> <z> <pitch> <yaw>       自由カメラにして、位置（ワールド座標）と向き（度。pitch は正で下向き、yaw は 0 で北・時計回り）を決める（SE/AE だけ）
 //   @camoff                              自由カメラをやめる
 //   @fov <度>                            視野角
@@ -19,6 +20,8 @@
 // 結果は MiniSkirt_cmd_result.txt に追記する。
 
 #include "PCH.h"
+
+#include "DevFlags.h"
 
 #include <chrono>
 #include <filesystem>
@@ -93,6 +96,16 @@ namespace DebugCmd
 				RunScript(rest, ref);
 			} else if (a_line.rfind("@enabled ", 0) == 0) {
 				Probe::DebugSetEnabled(a_line.substr(9) != "0");
+			} else if (a_line.rfind("@flag ", 0) == 0) {
+				// 開発用の切り替え（DevFlags.h）。変えたあとで @enabled 0 → 1 などで作り直すと効く
+				std::istringstream ss(a_line.substr(6));
+				int                i = -1, v = 0;
+				ss >> i >> v;
+				if (i >= 0 && i < DevFlags::kCount) {
+					DevFlags::g[i] = v;
+				}
+				logger::info("デバッグコマンド: フラグ {} = {}", i, v);
+				Result(std::format("flag {} {}", i, v));
 			} else if (a_line.rfind("@hem ", 0) == 0) {
 				// スカート丈（cm、MCM と同じ値。16〜55）。「@hem 0」で上書きをやめる
 				Probe::DebugSetLength(std::stof(a_line.substr(5)));

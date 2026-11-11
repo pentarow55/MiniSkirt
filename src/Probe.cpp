@@ -4,6 +4,7 @@
 #include "PCH.h"
 
 #include "Band.h"
+#include "DevFlags.h"
 #include "Layout.h"
 #include "Skirt.h"
 #include "Underwear.h"
@@ -159,11 +160,6 @@ namespace Probe
 				g_cfg.underwear, mcm ? "あり" : "なし");
 			logger::info("設定: apply={} waist={} hem={} band_top={} remap_weights={} skirt_gap={} skirt_gap_nobone={} band_freeze_jiggle={}", g_cfg.apply,
 				g_cfg.waist, g_cfg.hem, g_cfg.bandTop, g_cfg.remapWeights, g_cfg.skirtGap, g_cfg.skirtGapNoBone, g_cfg.freezeJiggle);
-		}
-
-		ID3D11DeviceContext* Context()
-		{
-			return Verts::GameContext();
 		}
 
 		// 書き換え済みの頂点バッファ（二重に縮めない）
@@ -544,27 +540,12 @@ namespace Probe
 				ent.hemNew = trim ? g_cfg.hem : hemNew;
 				Verts::Seal(buf, n);
 				g_shortened = true;
-				// GPU 側へ反映
-				auto ctx = Context();
-				if (!vb || !ctx) {
-					logger::info("    → CPU 側だけ書き換えた（GPU の文脈が取れない）");
+				// GPU 側へ反映（新しい頂点バッファを作って差し替える）
+				if (!vb) {
+					logger::info("    → CPU 側だけ書き換えた（GPU の頂点バッファが無い）");
 					continue;
 				}
-				if (bd.Usage == D3D11_USAGE_DEFAULT) {
-					ctx->UpdateSubresource(vb, 0, nullptr, buf->rawVertexData, 0, 0);
-					logger::info("    → UpdateSubresource で反映");
-				} else if (bd.Usage == D3D11_USAGE_DYNAMIC) {
-					D3D11_MAPPED_SUBRESOURCE m{};
-					if (SUCCEEDED(ctx->Map(vb, 0, D3D11_MAP_WRITE_DISCARD, 0, &m))) {
-						std::memcpy(m.pData, buf->rawVertexData, static_cast<std::size_t>(n) * stride);
-						ctx->Unmap(vb, 0);
-						logger::info("    → Map(WRITE_DISCARD) で反映");
-					} else {
-						logger::info("    → Map に失敗");
-					}
-				} else {
-					logger::info("    → このバッファの種類 ({}) は書き込み方が未対応", static_cast<int>(bd.Usage));
-				}
+				logger::info("    → {}", Verts::Upload(buf, n, part) ? "GPU の頂点バッファを作り直して差し替えた" : "GPU に反映できない");
 			}
 		}
 
@@ -795,16 +776,24 @@ namespace Probe
 			// 帯（足首〜上端の裸の体）を先に用意する。用意できなければ縮めない（縮めると脚が消えるので、ロングのままにする）
 			// スカートの中に着ける下着（所持品・服装・ランダム）。無効なら裸の体だけ
 			std::string underwear;
-			if (g_cfg.underwear) {
+			if (g_cfg.underwear && !DevFlags::On(DevFlags::kNoUnderwear)) {
 				underwear = Underwear::Find(actor, armor, static_cast<int>(std::lround(g_cfg.bandTop))).path;
 			}
-			if (!Band::Attach(actor, underwear)) {
-				logger::info("  → 帯（裸の体）を用意できないので、この NPC のスカートは縮めない（ロングのまま）。帯ファイルが次の起動から読めれば短くなる");
+			if (!DevFlags::On(DevFlags::kNoBand)) {
+				if (!Band::Attach(actor, underwear)) {
+					logger::info("  → 帯（裸の体）を用意できないので、この NPC のスカートは縮めない（ロングのまま）。帯ファイルが次の起動から読めれば短くなる");
+					return false;
+				}
+				// 帯の肌の材質の付け替えは、帯を付けたのと同じフレームで（まだ一度も描かれていないうちに）する。
+				// 段を分けて次のフレームにしたら、描かれた後の材質を取り替えることになり、VR でゲームが固まった（ドラゴンズリーチ・バナード・メアで 2 回とも、この直後に止まった）
+				if (!DevFlags::On(DevFlags::kNoSkin)) {
+					Band::MatchSkin(actor, obj.partClone.get());
+				}
+			}
+			if (DevFlags::On(DevFlags::kNoShorten)) {
+				logger::info("  開発用フラグ: 帯だけ付けて、スカートは縮めない");
 				return false;
 			}
-			// 帯の肌の材質の付け替えは、帯を付けたのと同じフレームで（まだ一度も描かれていないうちに）する。
-			// 段を分けて次のフレームにしたら、描かれた後の材質を取り替えることになり、VR でゲームが固まった（ドラゴンズリーチ・バナード・メアで 2 回とも、この直後に止まった）
-			Band::MatchSkin(actor, obj.partClone.get());
 			a_job.id = a_id;
 			a_job.root = obj.partClone;
 			a_job.armor = armor;

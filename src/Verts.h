@@ -7,40 +7,27 @@
 // そこで、最後に自分が書いた中身のハッシュも覚え、いまの中身と同じときだけ「自分が書き換えた物」とみなす
 // （違えば古い記録なので捨てる。違う物に元を書き戻して壊さない）。
 
+#include "DevFlags.h"
+
 #include <d3d11.h>
 #include <d3d11_4.h>
 
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <map>
+#include <mutex>
 #include <unordered_map>
 #include <vector>
 
 namespace Verts
 {
-	// ゲームの描画用の context（immediate context）。初めて使うときに D3D11 の多スレッド保護を入れる。
-	// VR では SKSE の task がいくつもの作業スレッドで動き、ゲームの描画と同時に context を触ることがある。
-	// context は同時に 2 つのスレッドから使えないので、そのときドライバの中でゲームが固まった
-	// （ドラゴンズリーチ・バナード・メアで、頂点を GPU に書いた直後に 3 回止まった）。保護を入れると、呼び出しごとに順番待ちになる
-	inline ID3D11DeviceContext* GameContext()
-	{
-		auto r = RE::BSGraphics::Renderer::GetSingleton();
-		auto ctx = r ? reinterpret_cast<ID3D11DeviceContext*>(r->GetRuntimeData().context) : nullptr;
-		static bool s_done = false;
-		if (ctx && !s_done) {
-			s_done = true;
-			ID3D11Multithread* mt = nullptr;
-			if (SUCCEEDED(ctx->QueryInterface(__uuidof(ID3D11Multithread), reinterpret_cast<void**>(&mt))) && mt) {
-				const BOOL before = mt->SetMultithreadProtected(TRUE);
-				logger::info("D3D11 の多スレッド保護: 前は{}、いまは{}", before ? "入っていた" : "切れていた", mt->GetMultithreadProtected() ? "入っている" : "切れている");
-				mt->Release();
-			} else {
-				logger::warn("D3D11 の多スレッド保護を入れられない（ID3D11Multithread が無い）");
-			}
-		}
-		return ctx;
-	}
+	// GPU への書き込みについて（経緯）:
+	// ゲームの描画用の context（immediate context）は同時に 2 つのスレッドから使えない。VR では SKSE の task がいくつもの作業スレッドで動き、
+	// ゲームの描画と同時に context を触ってドライバの中で固まった（ドラゴンズリーチ・バナード・メア）。そこで D3D11 の多スレッド保護を入れていたが、
+	// それが Bottled Shaders と合わず画面が壊れた。いまは context を使わず、ID3D11Device（多スレッドから使ってよい）で
+	// 新しいバッファを作って差し替える（Replace）。多スレッド保護も入れない
 
 	struct Entry
 	{
@@ -130,33 +117,103 @@ namespace Verts
 		~SealGuard() { Seal(b, n); }
 	};
 
-	// CPU 側の頂点を GPU の頂点バッファへ書き戻す
-	inline bool Upload(RE::BSGraphics::TriShape* a_b, std::uint32_t a_count)
+	inline ID3D11Device* Device()
 	{
-		auto ctx = GameContext();
-		auto vb = reinterpret_cast<ID3D11Buffer*>(a_b->vertexBuffer);
-		if (!ctx || !vb) {
+		auto r = RE::BSGraphics::Renderer::GetSingleton();
+		return r ? reinterpret_cast<ID3D11Device*>(r->GetRuntimeData().forwarder) : nullptr;
+	}
+
+	// 差し替えて外した古いバッファ。描画がまだ使っているかもしれないので、しばらく待ってから手放す
+	struct Retired
+	{
+		ID3D11Buffer*                         buf;
+		std::chrono::steady_clock::time_point at;
+	};
+	inline std::mutex           g_retiredMutex;
+	inline std::vector<Retired> g_retired;
+
+	inline void Retire(ID3D11Buffer* a_buf, int a_refs)
+	{
+		std::lock_guard l(g_retiredMutex);
+		const auto      now = std::chrono::steady_clock::now();
+		for (auto it = g_retired.begin(); it != g_retired.end();) {
+			if (now - it->at > std::chrono::seconds(10)) {
+				it->buf->Release();
+				it = g_retired.erase(it);
+			} else {
+				++it;
+			}
+		}
+		for (int i = 0; i < a_refs; ++i) {
+			g_retired.push_back({ a_buf, now });
+		}
+	}
+
+	// CPU 側の写し（a_data）から GPU のバッファを新しく作り、a_b の頂点（a_index なら面）のバッファと差し替える。
+	// 同じ区画の集まり（a_part）で同じバッファを指している区画もまとめて差し替える（区画ごとに参照を 1 つ持つ）。
+	// ゲームの描画用の context（immediate context）は使わない（ID3D11Device は多スレッドから使ってよい）。
+	// 以前は context に UpdateSubresource で書いていたが、作業スレッドから context を使うために入れた D3D11 の多スレッド保護が、
+	// Bottled Shaders（Community Shaders のフォーク）と合わず、場所を移ると画面全体が灰色になりテクスチャが消えた（1.0.0、SE 1.7.104 で再現）
+	inline bool Replace(RE::BSGraphics::TriShape* a_b, RE::NiSkinPartition* a_part, bool a_index, const void* a_data, std::size_t a_bytes)
+	{
+		if (DevFlags::On(DevFlags::kNoUpload)) {
+			return false;  // 開発用: GPU に書かない
+		}
+		auto  dev = Device();
+		auto& slot = a_index ? a_b->indexBuffer : a_b->vertexBuffer;
+		auto  old = reinterpret_cast<ID3D11Buffer*>(slot);
+		if (!dev || !old || !a_data) {
 			return false;
 		}
 		D3D11_BUFFER_DESC bd{};
-		vb->GetDesc(&bd);
-		if (bd.Usage == D3D11_USAGE_DEFAULT) {
-			ctx->UpdateSubresource(vb, 0, nullptr, a_b->rawVertexData, 0, 0);
-			return true;
+		old->GetDesc(&bd);
+		if (a_bytes < bd.ByteWidth) {
+			logger::warn("GPU のバッファを作り直せない: 写しが {} バイトで、バッファの {} バイトより小さい", a_bytes, bd.ByteWidth);
+			return false;
 		}
-		if (bd.Usage == D3D11_USAGE_DYNAMIC) {
-			D3D11_MAPPED_SUBRESOURCE m{};
-			if (SUCCEEDED(ctx->Map(vb, 0, D3D11_MAP_WRITE_DISCARD, 0, &m))) {
-				std::memcpy(m.pData, a_b->rawVertexData, Bytes(a_b, a_count));
-				ctx->Unmap(vb, 0);
-				return true;
+		D3D11_SUBRESOURCE_DATA init{};
+		init.pSysMem = a_data;
+		ID3D11Buffer* nb = nullptr;
+		const HRESULT hr = dev->CreateBuffer(&bd, &init, &nb);
+		if (FAILED(hr) || !nb) {
+			logger::warn("GPU のバッファを作れない（HRESULT {:08X}）", static_cast<std::uint32_t>(hr));
+			return false;
+		}
+		int holders = 0;
+		auto swap = [&](RE::BSGraphics::TriShape* a_t) {
+			auto& s = a_index ? a_t->indexBuffer : a_t->vertexBuffer;
+			if (reinterpret_cast<ID3D11Buffer*>(s) != old) {
+				return;
+			}
+			if (holders++) {
+				nb->AddRef();
+			}
+			s = reinterpret_cast<REX::W32::ID3D11Buffer*>(nb);
+		};
+		if (a_part) {
+			for (std::uint32_t i = 0; i < a_part->numPartitions; ++i) {
+				if (auto t = a_part->partitions[i].buffData) {
+					swap(t);
+				}
 			}
 		}
-		return false;
+		swap(a_b);  // a_part に入っていない（または a_part が無い）とき
+		if (!holders) {
+			nb->Release();
+			return false;
+		}
+		Retire(old, holders);
+		return true;
+	}
+
+	// CPU 側の頂点を GPU の頂点バッファへ書き戻す（新しいバッファを作って差し替える）
+	inline bool Upload(RE::BSGraphics::TriShape* a_b, std::uint32_t a_count, RE::NiSkinPartition* a_part)
+	{
+		return a_b && Replace(a_b, a_part, false, a_b->rawVertexData, Bytes(a_b, a_count));
 	}
 
 	// 自分が書き換えた物なら元に戻して GPU に書き戻し、記録を消す。戻したら true
-	inline bool Restore(RE::BSGraphics::TriShape* a_b, std::uint32_t a_count)
+	inline bool Restore(RE::BSGraphics::TriShape* a_b, std::uint32_t a_count, RE::NiSkinPartition* a_part)
 	{
 		auto e = Owned(a_b, a_count);
 		if (!e) {
@@ -164,7 +221,7 @@ namespace Verts
 		}
 		std::memcpy(a_b->rawVertexData, e->orig.data(), e->orig.size());
 		g_map.erase(a_b);
-		Upload(a_b, a_count);
+		Upload(a_b, a_count, a_part);
 		return true;
 	}
 
@@ -178,7 +235,7 @@ namespace Verts
 		}
 		int n = 0;
 		for (std::uint32_t i = 0; i < part->numPartitions; ++i) {
-			n += Restore(part->partitions[i].buffData, part->vertexCount) ? 1 : 0;
+			n += Restore(part->partitions[i].buffData, part->vertexCount, part) ? 1 : 0;
 		}
 		return n;
 	}
@@ -326,7 +383,7 @@ namespace Verts
 			}
 		}
 		if (restored) {
-			Upload(a_b, n);
+			Upload(a_b, n, part);
 			if (!own) {
 				logger::info("    切り済みの頂点を {} で戻した（NPC {:08X}、頂点 {} 個）", how, a_actor, restored);
 			}

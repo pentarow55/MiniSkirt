@@ -1,6 +1,7 @@
 #include "PCH.h"
 
 #include "Band.h"
+#include "DevFlags.h"
 #include "Layout.h"
 #include "Skirt.h"
 #include "Verts.h"
@@ -175,18 +176,12 @@ namespace Band
 		};
 		std::map<std::string, Cut> g_cuts;  // 体 nif のパス＋範囲 → 切り詰め済みの体
 
-		ID3D11DeviceContext* Context()
-		{
-			return Verts::GameContext();
-		}
-
 		// 腰から膝の帯の外の三角形を消す（面の番号を 0,0,0 にして何も描かせない）。頂点は触らない。
 		// 戻り値: 消せた shape の数。区画ごとに面のバッファが別でなければ何もしない（ログに構造を出す）
 		int CutShapes(RE::NiNode* a_root, float a_zLo, float a_zHi)
 		{
 			std::vector<RE::BSGeometry*> shapes;
 			CollectSkinned(a_root, shapes);
-			auto ctx = Context();
 			int  cut = 0;
 			for (auto geo : shapes) {
 				auto skin = geo->GetGeometryRuntimeData().skinInstance.get();
@@ -218,7 +213,7 @@ namespace Band
 				for (std::uint32_t i = 0; i < part->numPartitions && ok; ++i) {
 					auto& p = part->partitions[i];
 					auto  b = p.buffData;
-					if (!b || !b->rawIndexData || !b->rawVertexData || !b->indexBuffer || !ctx) {
+					if (!b || !b->rawIndexData || !b->rawVertexData || !b->indexBuffer) {
 						ok = false;
 						break;
 					}
@@ -247,8 +242,8 @@ namespace Band
 							++removed;
 						}
 					}
-					reinterpret_cast<ID3D11DeviceContext*>(ctx)->UpdateSubresource(reinterpret_cast<ID3D11Buffer*>(b->indexBuffer), 0, nullptr, b->rawIndexData, 0, 0);
-					logger::info("  帯: [{}] 区画{} 三角 {} 個のうち {} 個を消した", geo->name.c_str(), i, p.triangles, removed);
+					const bool up = Verts::Replace(b, part, true, b->rawIndexData, static_cast<std::size_t>(p.triangles) * 6);
+					logger::info("  帯: [{}] 区画{} 三角 {} 個のうち {} 個を消した{}", geo->name.c_str(), i, p.triangles, removed, up ? "" : "（GPU に反映できない）");
 				}
 				if (ok) {
 					++cut;
@@ -1502,7 +1497,6 @@ namespace Band
 
 		std::vector<RE::BSGeometry*> geos;
 		CollectSkinned(a_outfit, geos);
-		auto ctx = Context();
 		int  skinShapes = 0;
 		for (auto geo : geos) {
 			auto skin = geo->GetGeometryRuntimeData().skinInstance.get();
@@ -1648,16 +1642,9 @@ namespace Band
 					++collapsed;
 				}
 				ent.hidden = true;
-				D3D11_BUFFER_DESC bd{};
-				auto              vb = reinterpret_cast<ID3D11Buffer*>(buf->vertexBuffer);
-				if (vb) {
-					vb->GetDesc(&bd);
-				}
-				if (vb && ctx && bd.Usage == D3D11_USAGE_DEFAULT) {
-					ctx->UpdateSubresource(vb, 0, nullptr, raw, 0, 0);
-				}
+				const bool up = Verts::Upload(buf, n, part);
 				logger::info("  服の脚: [{}] 帯の範囲の頂点 {} 個（腕・手首 {} 個は残す）→ 1 点に集めた {} 個、縁なので残した {} 個{}",
-					geo->name.c_str(), nLow + nArm, nArm, collapsed, edge, vb && bd.Usage == D3D11_USAGE_DEFAULT ? "" : "（GPU に反映できない）");
+					geo->name.c_str(), nLow + nArm, nArm, collapsed, edge, up ? "" : "（GPU に反映できない）");
 			}
 		}
 		if (!skinShapes) {
@@ -2151,8 +2138,10 @@ namespace Band
 		// 消す三角形にしか使われていない頂点（候補で、残る三角形に使われていない）の位置を NaN にする。
 		// D3D11 は位置が NaN の頂点を含む三角形を捨てるので、面のバッファを触らずに（同じ服を着たほかの人の面を壊さずに）三角形を消せる。
 		// 縁の頂点（残る三角形にも使われる）は動かさない。別の頂点にまとめる方式は、まとめ先が散らばって、縁どうしをつなぐ面（スカートの底のふた）になった
-		int collapsed = 0, nEdge = 0;
+		int         collapsed = 0, nEdge = 0;
 		const float nan = std::numeric_limits<float>::quiet_NaN();
+		const bool  noNan = DevFlags::On(DevFlags::kNoNan);
+		float       pt[3]{ nan, nan, nan };  // 開発用（kNoNan）: 消す頂点をすべて集める 1 点（最初に消す頂点の位置）
 		for (std::uint32_t v = 0; v < n; ++v) {
 			if (!cand[v] || partOf[v] < 0) {
 				continue;
@@ -2162,7 +2151,10 @@ namespace Band
 				continue;
 			}
 			float* f = pos(v);
-			f[0] = f[1] = f[2] = nan;
+			if (noNan && std::isnan(pt[0])) {
+				pt[0] = f[0], pt[1] = f[1], pt[2] = f[2];
+			}
+			f[0] = pt[0], f[1] = pt[1], f[2] = pt[2];
 			a_dead[v] = 1;
 			++collapsed;
 		}
@@ -2323,7 +2315,7 @@ namespace Band
 				f[1] = pos[k][v].y - it2.fo[1];
 			}
 			ent.shaped = true;
-			Verts::Upload(it2.buf, it2.n);
+			Verts::Upload(it2.buf, it2.n, it2.part);
 		}
 		const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count();
 		auto us = [](auto a, auto b) { return std::chrono::duration_cast<std::chrono::microseconds>(b - a).count(); };
@@ -2534,7 +2526,6 @@ namespace Band
 			return bb;
 		};
 
-		auto ctx = Context();
 		for (auto geo : a_skirts) {
 			auto skin = geo->GetGeometryRuntimeData().skinInstance.get();
 			auto part = skin ? skin->skinPartition.get() : nullptr;
@@ -2824,14 +2815,7 @@ namespace Band
 					logger::info("    体の重みを写した頂点 {} 個（{}）", copied, a_bodyWeights ? "体に近いほど強く" : "body_weights=0 なので写さない");
 				}
 				ent.fitted = true;
-				D3D11_BUFFER_DESC bd{};
-				auto              vb = reinterpret_cast<ID3D11Buffer*>(buf->vertexBuffer);
-				if (vb) {
-					vb->GetDesc(&bd);
-				}
-				if (vb && ctx && bd.Usage == D3D11_USAGE_DEFAULT) {
-					ctx->UpdateSubresource(vb, 0, nullptr, raw, 0, 0);
-				}
+				Verts::Upload(buf, n, part);
 				logger::info("  スカート: [{}] 帯から {:.1f} 以上離す（z {:.1f} から上端+3 へ弱める）: 押し出した頂点 {} 個（最大 {:.1f}）、お尻の揺れ骨 {} → {}（重みを混ぜた頂点 {} 個）",
 					geo->name.c_str(), gapW, t0, pushed, maxPush, buttNames.empty() ? "見つからない" : buttNames,
 					useB ? std::format("スカートにある {}", found) : std::string("スカートの骨の一覧に無い"), blended);
