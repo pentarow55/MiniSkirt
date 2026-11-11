@@ -46,12 +46,15 @@ namespace Underwear
 			return false;
 		}
 
-		bool HasWord(const std::string& a_s)
+		// 名前・EditorID は null のことがある。実行時に作られたキーワード（FF 番台）はゲーム自身が EditorID に null を返し、
+		// std::string にすると起動時に落ちた（1.0.0。SE 1.7.104 で再現・確認）
+		bool HasWord(const char* a_p)
 		{
-			if (a_s.empty()) {
+			if (!a_p || !*a_p) {
 				return false;
 			}
-			const auto low = Lower(a_s);
+			const std::string a_s = a_p;
+			const auto        low = Lower(a_s);
 			for (auto w : kWords) {
 				if (low.find(w) != std::string::npos) {
 					return true;
