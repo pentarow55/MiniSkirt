@@ -38,6 +38,7 @@ namespace Verts
 		bool                      shaped{ false };     // A ラインにした
 		bool                      trim{ false };       // 鎧の裾の飾り（切り線より下にある輪）。全部切って消した。スカートとしては扱わない
 		bool                      hidden{ false };     // 服の脚を消した
+		bool                      cut{ true };         // 裾を切った（元の裾が丈の目標より上で、切る所が無かったときは false。形を変えない）
 		float                     hemNew{ 0.0f };      // 縮めたあとの裾の高さ
 		std::vector<float>        sleeve;              // 頂点ごとの袖の度合い（0〜1）。縮め・広がり・押し出しをこの分だけ止める
 		std::vector<char>         dead;                // 切り捨てた布の頂点（縁の頂点の位置に重ねてある）。動かさない

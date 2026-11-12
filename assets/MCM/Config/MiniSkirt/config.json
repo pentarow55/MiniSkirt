@@ -18,6 +18,15 @@
       }
     },
     {
+      "id": "bExcludeElderly:General",
+      "text": "$MSK_ElderlyText",
+      "help": "$MSK_ElderlyHelp",
+      "type": "toggle",
+      "valueOptions": {
+        "sourceType": "ModSettingBool"
+      }
+    },
+    {
       "type": "empty"
     },
     {
@@ -31,7 +40,7 @@
       "type": "slider",
       "valueOptions": {
         "min": 16,
-        "max": 55,
+        "max": 100,
         "step": 1,
         "formatString": "{0}",
         "sourceType": "ModSettingFloat"

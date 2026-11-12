@@ -3,7 +3,7 @@
 //   @spawn <ベースの FormID(16進)>      プレイヤーの足元に出す。出した参照の FormID を結果ファイルに書く
 //   @on <参照の FormID(16進)> <コマンド>  その参照を対象にコンソールコマンドを実行する（例: @on FF000D95 moveto player 0 400 0）
 //   @enabled <0|1>                       MiniSkirt の有効／無効を切り替え、読み込み済みの NPC を作り直す
-//   @hem <cm>                            スカート丈を上書きする（MCM と同じ値。0 で上書きをやめる）
+//   @hem <%>                             スカート丈を上書きする（MCM と同じ値。0 で上書きをやめる）
 //   @flag <番号> <0|1>                   開発用の切り替え（DevFlags.h）。不具合の切り分けで処理の一部を変える
 //   @cam <x> <y> <z> <pitch> <yaw>       自由カメラにして、位置（ワールド座標）と向き（度。pitch は正で下向き、yaw は 0 で北・時計回り）を決める（SE/AE だけ）
 //   @camoff                              自由カメラをやめる
@@ -107,7 +107,7 @@ namespace DebugCmd
 				logger::info("デバッグコマンド: フラグ {} = {}", i, v);
 				Result(std::format("flag {} {}", i, v));
 			} else if (a_line.rfind("@hem ", 0) == 0) {
-				// スカート丈（cm、MCM と同じ値。16〜55）。「@hem 0」で上書きをやめる
+				// スカート丈（%、MCM と同じ値。16〜100）。「@hem 0」で上書きをやめる
 				Probe::DebugSetLength(std::stof(a_line.substr(5)));
 				Result("hem " + a_line.substr(5));
 			} else if (a_line.rfind("@cam ", 0) == 0 || a_line == "@camoff") {
