@@ -34,7 +34,7 @@ namespace Probe
 			bool  apply{ true };
 			bool  enabled{ true };         // MCM の「有効」。無効にすると全員を元のロングに戻して帯を外す
 			float waist{ 70.0f };
-			float lengthPct{ 22.0f };      // スカート丈（ウエストバンドの上端から床までを 100 とした %。100 は元の長さのまま）
+			float lengthPct{ 24.0f };      // スカート丈（ウエストバンドの上端を 0、標準の長いドレスのすそ（高さ 6）を 100 とした %。100 は元の長さのまま）
 			float hem{ 65.0f };            // 縮めたあとのすその高さ（足元 0・頭のてっぺん ≒ 128）。lengthPct から求める
 			bool  excludeElderly{ false }; // 年配の女性（種族が Elder）は何もしない
 			float hipEase{ 1.0f };         // A ライン: お尻まわりのゆとり（帯の体のいちばん外からの幅）
@@ -83,17 +83,21 @@ namespace Probe
 
 		float F(const std::string& a_v) { return static_cast<float>(std::atof(a_v.c_str())); }
 
-		// スカート丈（%）→ すその高さ。ウエストバンドの上端（高さ 78）から床（0）までを 100% とする。物差しは身長 165 cm（= 頭のてっぺん 128）の
-		// 標準の体で、78 単位 ≒ 100.5 cm なので 1% ≒ 1 cm（1.0 までの版の cm の値をそのまま % として読んでも、丈の違いは 1% 未満）。
-		// 目安: 16% → 65.5（お尻がぎりぎり隠れる。1.0 の最短 16 cm と同じ）、40 → 47（太ももの真ん中）、45 → 43（ひざの少し上）、52 → 37（ひざ）。
-		// 100% は床なので、どのスカートも元の長さのまま（縮めず、形も変えない。脚だけ体の脚にする）
+		// スカート丈（%）→ すその高さ。ウエストバンドの上端（高さ 78）を 0%、バニラの長いドレスの標準のすそ（高さ 6、床から約 8 cm）を 100% とする。
+		// バニラでスカートと判定した服 123 着のすその高さは中央値 6.1、104 着が 5〜10（床まで届く服は無い）。床を 100% にすると 92% 前後から上が効かなかった。
+		// 物差しは身長 165 cm（= 頭のてっぺん 128）の標準の体で、1% = 0.72 単位 ≒ 0.93 cm。
+		// 目安: 17% → 65.8（お尻がぎりぎり隠れる。1.0 の最短 16 cm とほぼ同じ）、27 → 58.6（太ももの付け根の下）、43 → 47（太ももの真ん中）、
+		// 49 → 42.7（ひざの少し上）、56 → 37.7（ひざ）。
+		// 100% はどのスカートも元の長さのまま（床まで届く服でも切らず、形も変えない。脚だけ体の脚にする。FullLength）
+		// 1.0 の cm の値（MCM の fSkirtLength）はそのまま % として読む（少し長めになるだけ。ユーザーの判断）
 		constexpr float kWaistbandZ = 78.0f;
-		constexpr float kLengthMinPct = 16.0f;
+		constexpr float kFullHemZ = 6.0f;
+		constexpr float kLengthMinPct = 17.0f;
 		constexpr float kLengthMaxPct = 100.0f;
 		constexpr float kCmPerUnit = 165.0f / 128.0f;
 		float           HemFromLength(float a_pct)
 		{
-			return kWaistbandZ * (1.0f - (std::clamp)(a_pct, kLengthMinPct, kLengthMaxPct) / 100.0f);
+			return kWaistbandZ - (kWaistbandZ - kFullHemZ) * (std::clamp)(a_pct, kLengthMinPct, kLengthMaxPct) / 100.0f;
 		}
 		bool FullLength() { return g_cfg.lengthPct >= kLengthMaxPct; }
 		bool  B(const std::string& a_v) { return std::atoi(a_v.c_str()) != 0 || a_v == "true" || a_v == "True"; }
@@ -113,7 +117,7 @@ namespace Probe
 				} else if (key == "skirt_length") {
 					g_cfg.lengthPct = F(val);
 				} else if (key == "skirt_length_cm") {  // 1.0 の ini（cm）。% に換算する
-					g_cfg.lengthPct = F(val) / kCmPerUnit / kWaistbandZ * 100.0f;
+					g_cfg.lengthPct = F(val) / kCmPerUnit / (kWaistbandZ - kFullHemZ) * 100.0f;
 				} else if (key == "exclude_elderly") {
 					g_cfg.excludeElderly = B(val);
 				} else if (key == "hip_ease") {
@@ -146,7 +150,7 @@ namespace Probe
 				if (key == "bEnabled") {
 					g_cfg.enabled = B(val);
 				} else if (key == "fSkirtLength") {
-					// 1.0 では cm、1.1 から %。1% ≒ 1 cm なので、更新前に MCM で選んだ値はそのまま読む（丈の違いは 1% 未満）
+					// 1.0 では cm、1.1 から %。更新前に MCM で選んだ値はそのまま % として読む（1% ≒ 0.93 cm なので少し長めになる。気に入らなければ短くすればよい）
 					g_cfg.lengthPct = F(val);
 				} else if (key == "bExcludeElderly") {
 					g_cfg.excludeElderly = B(val);

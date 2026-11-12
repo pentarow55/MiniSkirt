@@ -39,7 +39,7 @@
       "help": "$MSK_HemHelp",
       "type": "slider",
       "valueOptions": {
-        "min": 16,
+        "min": 17,
         "max": 100,
         "step": 1,
         "formatString": "{0}",
