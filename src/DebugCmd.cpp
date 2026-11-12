@@ -2,6 +2,7 @@
 // コンソールのキー入力を使わずに、NPC を出す・動かす・消すのを自動化するため。公開前に外す。
 //   @spawn <ベースの FormID(16進)>      プレイヤーの足元に出す。出した参照の FormID を結果ファイルに書く
 //   @on <参照の FormID(16進)> <コマンド>  その参照を対象にコンソールコマンドを実行する（例: @on FF000D95 moveto player 0 400 0）
+//   @anim <NPC の参照> <イベント名>        アニメーションのグラフにイベントを送る（受け付けたら 1）
 //   @enabled <0|1>                       MiniSkirt の有効／無効を切り替え、読み込み済みの NPC を作り直す
 //   @hem <%>                             スカート丈を上書きする（MCM と同じ値。0 で上書きをやめる）
 //   @flag <番号> <0|1>                   開発用の切り替え（DevFlags.h）。不具合の切り分けで処理の一部を変える
@@ -94,6 +95,15 @@ namespace DebugCmd
 					return;
 				}
 				RunScript(rest, ref);
+			} else if (a_line.rfind("@anim ", 0) == 0) {
+				// NPC のアニメーションのグラフにイベントを送る（座る・しゃがむなどの姿勢を作る）。受け付けられたかを結果に書く
+				std::istringstream ss(a_line.substr(6));
+				std::string        a, ev;
+				ss >> a >> ev;
+				auto       actor = RE::TESForm::LookupByID<RE::Actor>(static_cast<RE::FormID>(std::stoul(a, nullptr, 16)));
+				const bool ok = actor && actor->NotifyAnimationGraph(ev);
+				logger::info("デバッグコマンド: {} にアニメーションのイベント {} → {}", a, ev, ok);
+				Result(std::format("anim {} {} {}", a, ev, ok ? 1 : 0));
 			} else if (a_line.rfind("@enabled ", 0) == 0) {
 				Probe::DebugSetEnabled(a_line.substr(9) != "0");
 			} else if (a_line.rfind("@flag ", 0) == 0) {
