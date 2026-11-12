@@ -1,6 +1,6 @@
 {
 	"name": "miniskirt",
-	"version-semver": "1.0.1",
+	"version-semver": "1.1.0",
 	"dependencies": [
 		"directxmath",
 		"directxtk",
