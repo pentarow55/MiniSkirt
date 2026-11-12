@@ -3,7 +3,7 @@
 //   @spawn <ベースの FormID(16進)>      プレイヤーの足元に出す。出した参照の FormID を結果ファイルに書く
 //   @on <参照の FormID(16進)> <コマンド>  その参照を対象にコンソールコマンドを実行する（例: @on FF000D95 moveto player 0 400 0）
 //   @anim <NPC の参照> <イベント名>        アニメーションのグラフにイベントを送る（受け付けたら 1）
-//   @enabled <0|1>                       MiniSkirt の有効／無効を切り替え、読み込み済みの NPC を作り直す
+//   @enabled <0|1|-1>                    MiniSkirt の有効／無効を MCM より優先して決め、読み込み済みの NPC を作り直す。-1 で上書きをやめて MCM に戻す
 //   @hem <%>                             スカート丈を上書きする（MCM と同じ値。0 で上書きをやめる）
 //   @flag <番号> <0|1>                   開発用の切り替え（DevFlags.h）。不具合の切り分けで処理の一部を変える
 //   @cam <x> <y> <z> <pitch> <yaw>       自由カメラにして、位置（ワールド座標）と向き（度。pitch は正で下向き、yaw は 0 で北・時計回り）を決める（SE/AE だけ）
@@ -32,7 +32,7 @@
 
 namespace Probe
 {
-	void DebugSetEnabled(bool a_on);
+	void DebugSetEnabled(int a_on);
 	void DebugSetLength(float a_cm);
 }
 
@@ -105,7 +105,8 @@ namespace DebugCmd
 				logger::info("デバッグコマンド: {} にアニメーションのイベント {} → {}", a, ev, ok);
 				Result(std::format("anim {} {} {}", a, ev, ok ? 1 : 0));
 			} else if (a_line.rfind("@enabled ", 0) == 0) {
-				Probe::DebugSetEnabled(a_line.substr(9) != "0");
+				const auto v = a_line.substr(9);
+				Probe::DebugSetEnabled(v.rfind("-", 0) == 0 ? -1 : (v != "0" ? 1 : 0));
 			} else if (a_line.rfind("@flag ", 0) == 0) {
 				// 開発用の切り替え（DevFlags.h）。変えたあとで @enabled 0 → 1 などで作り直すと効く
 				std::istringstream ss(a_line.substr(6));

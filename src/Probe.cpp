@@ -1164,11 +1164,14 @@ namespace Probe
 			LoadCfg();
 			if (g_dbgEnabled >= 0) {
 				g_cfg.enabled = g_dbgEnabled != 0;
+				// 上の「設定:」の行は設定ファイルの値。上書き中だと MCM を変えても効かないので、分かるように書く
+				logger::info("設定: 開発用の上書き中（@enabled）: 有効={}（MCM の「有効」は使わない。@enabled -1 で上書きをやめる）", g_cfg.enabled);
 			}
 #ifdef MINISKIRT_DEVTOOLS
 			if (g_dbgLengthPct > 0) {
 				g_cfg.lengthPct = (std::clamp)(g_dbgLengthPct, kLengthMinPct, kLengthMaxPct);
 				g_cfg.hem = HemFromLength(g_cfg.lengthPct);
+				logger::info("設定: 開発用の上書き中（@hem）: スカート丈 {}%（@hem 0 で上書きをやめる）", g_cfg.lengthPct);
 			}
 #endif
 			const bool topChanged = std::lround(old.bandTop) != std::lround(g_cfg.bandTop);
@@ -1337,9 +1340,9 @@ namespace Probe
 	}
 
 	// 開発用: 有効／無効を切り替えて全員を作り直す
-	void DebugSetEnabled(bool a_on)
+	void DebugSetEnabled(int a_on)
 	{
-		g_dbgEnabled = a_on ? 1 : 0;
+		g_dbgEnabled = a_on < 0 ? -1 : (a_on ? 1 : 0);  // 負なら上書きをやめ、設定ファイル（MCM）の「有効」に戻す
 		ApplySettings();
 	}
 
