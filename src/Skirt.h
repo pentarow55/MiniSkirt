@@ -800,8 +800,11 @@ namespace Skirt
 	//  どの高さでも体のその高さの半径 + ease 以上（上端から 8 下までで 0 から ease へ）。内側の布は体 + ease/2 より内へ入れない
 	//  上端より上は変えない。a_sleeve（頂点ごとの袖の度合い）が 0.5 以上の頂点は元の半径に入れず、度合いの分だけ動かさない
 	// a_band: 帯の体の頂点（腕・手首は除く）。戻り値: 動かした頂点の数
+	// a_expandOnly（切らなかったスカート。丈 100% など）: 形は元のまま、帯の体に当たる所だけ外へ出す。お尻の線より下は「体 + ゆとり」、
+	//  上は上端〜お尻の線の山（上と同じ smoothstep）を、元の半径より大きいときだけ使う（縮めない・広がり角度を付けない）。
+	//  差し替えた脚（帯の体）の腰が、服に付いていた体より張っていると、元の布から出るため（フルダの服で腰の横に素肌が出た）
 	inline int ALine(std::vector<std::vector<Vec3>>& a_shapes, const std::vector<std::vector<float>>& a_sleeve, const std::vector<Vec3>& a_band, float a_waist,
-		float a_hem, float a_ease, float a_angle, float a_top, std::string& a_log, bool a_keepLayers = false)
+		float a_hem, float a_ease, float a_angle, float a_top, std::string& a_log, bool a_keepLayers = false, bool a_expandOnly = false)
 	{
 		using namespace ALineDetail;
 		constexpr float   kRise = 8.0f;
@@ -909,7 +912,9 @@ namespace Skirt
 				const float r0b = env.Lerp((ZB - z0) / kDz - 0.5f, tf);
 				const float rhip = (std::max)(RB + a_ease, r0b);
 				float       rt;
-				if (p.z < ZB) {
+				if (a_expandOnly && p.z < ZB) {
+					rt = 0.0f;  // お尻の線より下は体の外形（下の bz）だけ
+				} else if (p.z < ZB) {
 					rt = rhip + tanA * (ZB - p.z);
 				} else {
 					const float t = (std::clamp)((a_top - p.z) / (std::max)(a_top - ZB, 1e-3f), 0.0f, 1.0f);
@@ -921,7 +926,10 @@ namespace Skirt
 				// a_keepLayers（鎧）: 重なった板の間隔を保つ。外側（r0）の移動量 rt−r0 を、同じ方位・高さの全頂点へ同じだけ足す。
 				// 比で縮尺して体の外形でそろえると、内側の板が全部同じ半径に潰れて、前後が入れ替わる（背中に穴が空く）
 				// 縮めない（広げるほうだけ）: 鎧は目標（お尻の線＋ゆとり）より元から緩い。縮めると丸いお尻が板を突き破る
-				const float rn = a_keepLayers ? (std::max)(r + (std::max)(rt - r0, 0.0f), 1.0f) : (std::max)(r * rt / r0, bz + 0.5f * a_ease * fade);
+				float rn = a_keepLayers ? (std::max)(r + (std::max)(rt - r0, 0.0f), 1.0f) : (std::max)(r * rt / r0, bz + 0.5f * a_ease * fade);
+				if (a_expandOnly) {
+					rn = (std::max)(r * (std::max)(rt / r0, 1.0f), r);  // 広げるだけ（外側が足りない分の比で、重なった布もそろって出る）
+				}
 				float       f = rn / r;
 				f = 1.0f + (f - 1.0f) * (std::clamp)(1.0f - aw, 0.0f, 1.0f);
 				if (std::fabs(f - 1.0f) > 1e-4f) {
@@ -931,8 +939,8 @@ namespace Skirt
 				}
 			}
 		}
-		a_log = std::format("中心 ({:.1f}, {:.1f})、お尻の線 半径 {:.1f}〜{:.1f}・高さ {:.1f}〜{:.1f}、ゆとり {}、角度 {}°", cx, cy, rbMin, rbMax, zbMin, zbMax, a_ease,
-			a_angle);
+		a_log = std::format("中心 ({:.1f}, {:.1f})、お尻の線 半径 {:.1f}〜{:.1f}・高さ {:.1f}〜{:.1f}、ゆとり {}、{}", cx, cy, rbMin, rbMax, zbMin, zbMax, a_ease,
+			a_expandOnly ? std::string("切っていないので広げるだけ") : std::format("角度 {}°", a_angle));
 		return moved;
 	}
 }

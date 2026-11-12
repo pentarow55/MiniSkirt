@@ -876,8 +876,9 @@ namespace Probe
 				Walk(root, a_job.who);
 				Band::HideOutfitLegs(actor, root);
 			} else if (a_k == 2) {
-				// 鎧は重なった板の間隔を保って広げる（比で縮尺すると板が同じ半径に潰れて背中に穴が空いた）。切ったスカートが無ければ（丈 100% など）形を変えない
-				if (g_anyCut) Band::ShapeSkirt(actor, g_skirts, g_cfg.waist, g_hemNew < 1e8f ? g_hemNew : g_cfg.hem, g_cfg.hipEase, g_cfg.flareAngle, g_armorMode);
+				// 鎧は重なった板の間隔を保って広げる（比で縮尺すると板が同じ半径に潰れて背中に穴が空いた）。
+				// 切ったスカートが無ければ（丈 100% など）A ラインにはせず、差し替えた脚の腰に当たる所だけ外へ出す（形は元のまま）
+				Band::ShapeSkirt(actor, g_skirts, g_cfg.waist, g_hemNew < 1e8f ? g_hemNew : g_cfg.hem, g_cfg.hipEase, g_cfg.flareAngle, g_armorMode, !g_anyCut);
 			} else {
 				Band::FitSkirt(actor, g_skirts, g_hemNew < 1e8f ? g_hemNew : g_cfg.hem, g_cfg.skirtGap, g_cfg.skirtGapNoBone, g_cfg.bodyWeights);
 				g_skirtActors.insert(a_job.id);
