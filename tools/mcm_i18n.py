@@ -31,7 +31,7 @@ T = {}
 
 T["JAPANESE"] = {
     "General": "全体",
-    "Enabled": ("有効", "オンにすると、女性 NPC のスカートを短くし、スカートの中に体の脚を足します（丈が 100 のときも脚は足します）。オフにすると、メニューを閉じたときに全員のスカートを元の長さに戻し、足した脚を外します。"),
+    "Enabled": ("有効", "オンにすると、女性 NPC のスカート丈を変更します。また、服に付いている脚を隠して、使っている体（CBBE など）の脚を表示します。オフにすると、メニューを閉じたときに全員のスカートを元の長さに戻し、足した脚を外します。"),
     "Elderly": ("年配の女性を外す", "オンにすると、年配の女性（種族が年配の NPC）には何もしません。スカートは元の長さのままで、脚も足しません。"),
     "Shape": "スカートの形",
     "Hem": ("スカート丈（%）", "ウエストバンドからすそまでの長さ。バニラの標準的な長いドレスのすそ（床から約 8 cm）を 100 とします。17: マイクロミニ（最短）/ 27: 太ももの付け根の下 / 43: 太ももの真ん中 / 49: ひざの少し上 / 56: ひざ / 100: 元の長さ。100 では、床まで届く服でも、どの服も長さも形も元のままです。元の服より長くはならず、元のスカートがこの丈より短いときも元のままです。"),
@@ -46,7 +46,7 @@ T["JAPANESE"] = {
 
 T["ENGLISH"] = {
     "General": "General",
-    "Enabled": ("Enabled", "When on, women NPCs' skirts are shortened and the body's legs are added under the skirt (also at length 100). When turned off, closing the menu returns every skirt to its original length and removes the added legs."),
+    "Enabled": ("Enabled", "When on, the skirt length of women NPCs is changed. The legs that come with the outfit are also hidden, and the legs of the body you use (CBBE, etc.) are shown instead. When turned off, closing the menu returns every skirt to its original length and removes the added legs."),
     "Elderly": ("Exclude elderly women", "When on, elderly women (NPCs of the elder race) are left alone: their skirts keep the original length and no legs are added."),
     "Shape": "Skirt Shape",
     "Hem": ("Skirt length (%)", "Length from the waistband to the hem, where 100 is the hem of a standard long vanilla dress (about 8 cm above the floor). 17: micro mini (shortest) / 27: just below the top of the thigh / 43: mid-thigh / 49: just above the knee / 56: knee / 100: original length. At 100, every outfit keeps its original length and shape, even one that reaches the floor. Skirts never get longer than the original outfit, and a skirt already shorter than this is left as it is."),
@@ -61,7 +61,7 @@ T["ENGLISH"] = {
 
 T["FRENCH"] = {
     "General": "Général",
-    "Enabled": ("Activé", "Activé : les jupes des PNJ féminins sont raccourcies et les jambes du corps sont ajoutées sous la jupe (même à la longueur 100). Désactivé : à la fermeture du menu, toutes les jupes reprennent leur longueur d'origine et les jambes ajoutées sont retirées."),
+    "Enabled": ("Activé", "Activé : la longueur des jupes des PNJ féminins est modifiée. De plus, les jambes fournies avec la tenue sont masquées et celles du corps que vous utilisez (CBBE, etc.) sont affichées. Désactivé : à la fermeture du menu, toutes les jupes reprennent leur longueur d'origine et les jambes ajoutées sont retirées."),
     "Elderly": ("Exclure les femmes âgées", "Activé : les femmes âgées (PNJ de la race des anciens) ne sont pas modifiées. Leur jupe garde sa longueur d'origine et aucune jambe n'est ajoutée."),
     "Shape": "Forme de la jupe",
     "Hem": ("Longueur de la jupe (%)", "Longueur de la ceinture à l'ourlet, 100 étant l'ourlet d'une robe longue standard du jeu (environ 8 cm au-dessus du sol). 17: micro-mini (la plus courte) / 27: juste sous le haut de la cuisse / 43: mi-cuisse / 49: juste au-dessus du genou / 56: genou / 100: longueur d'origine. À 100, chaque tenue garde sa longueur et sa forme d'origine, même si elle touche le sol. Une jupe n'est jamais rallongée, et une jupe déjà plus courte reste telle quelle."),
@@ -76,7 +76,7 @@ T["FRENCH"] = {
 
 T["GERMAN"] = {
     "General": "Allgemein",
-    "Enabled": ("Aktiviert", "Wenn an: Die Röcke weiblicher NPCs werden gekürzt, und unter dem Rock werden die Beine des Körpers ergänzt (auch bei Länge 100). Wenn aus: Beim Schließen des Menüs bekommen alle Röcke wieder ihre ursprüngliche Länge, und die hinzugefügten Beine werden entfernt."),
+    "Enabled": ("Aktiviert", "Wenn an: Die Rocklänge weiblicher NPCs wird geändert. Außerdem werden die Beine der Kleidung ausgeblendet und die Beine des verwendeten Körpers (CBBE usw.) angezeigt. Wenn aus: Beim Schließen des Menüs bekommen alle Röcke wieder ihre ursprüngliche Länge, und die hinzugefügten Beine werden entfernt."),
     "Elderly": ("Ältere Frauen ausnehmen", "Wenn an: Ältere Frauen (NPCs der Rasse der Alten) bleiben unverändert. Ihr Rock behält die ursprüngliche Länge, und es werden keine Beine hinzugefügt."),
     "Shape": "Rockform",
     "Hem": ("Rocklänge (%)", "Länge vom Bund bis zum Saum, wobei 100 der Saum eines normalen langen Kleides aus dem Spiel ist (etwa 8 cm über dem Boden). 17: Mikro-Mini (am kürzesten) / 27: knapp unter dem Oberschenkelansatz / 43: Mitte des Oberschenkels / 49: knapp über dem Knie / 56: Knie / 100: ursprüngliche Länge. Bei 100 behält jede Kleidung Länge und Form, auch wenn sie bis zum Boden reicht. Röcke werden nie länger, und ein Rock, der schon kürzer ist, bleibt wie er ist."),
@@ -91,7 +91,7 @@ T["GERMAN"] = {
 
 T["SPANISH"] = {
     "General": "General",
-    "Enabled": ("Activado", "Si está activado, las faldas de las PNJ se acortan y se añaden las piernas del cuerpo bajo la falda (también con largo 100). Si se desactiva, al cerrar el menú todas las faldas vuelven a su largo original y se quitan las piernas añadidas."),
+    "Enabled": ("Activado", "Si está activado, cambia el largo de la falda de las PNJ. Además, oculta las piernas que trae la ropa y muestra las del cuerpo que usas (CBBE, etc.). Si se desactiva, al cerrar el menú todas las faldas vuelven a su largo original y se quitan las piernas añadidas."),
     "Elderly": ("Excluir a las ancianas", "Si se activa, las ancianas (PNJ de la raza de los ancianos) no se modifican: su falda conserva el largo original y no se añaden piernas."),
     "Shape": "Forma de la falda",
     "Hem": ("Largo de la falda (%)", "Largo desde la cinturilla hasta el bajo, siendo 100 el bajo de un vestido largo normal del juego (unos 8 cm sobre el suelo). 17: micro mini (la más corta) / 27: justo bajo el inicio del muslo / 43: mitad del muslo / 49: justo sobre la rodilla / 56: rodilla / 100: largo original. Con 100, toda la ropa conserva su largo y forma originales, aunque llegue al suelo. Las faldas nunca quedan más largas, y una falda ya más corta se deja como está."),
@@ -106,7 +106,7 @@ T["SPANISH"] = {
 
 T["ITALIAN"] = {
     "General": "Generale",
-    "Enabled": ("Attivo", "Se attivo, le gonne dei PNG femminili vengono accorciate e sotto la gonna vengono aggiunte le gambe del corpo (anche con lunghezza 100). Se disattivato, alla chiusura del menu tutte le gonne tornano alla lunghezza originale e le gambe aggiunte vengono rimosse."),
+    "Enabled": ("Attivo", "Se attivo, cambia la lunghezza della gonna dei PNG femminili. Inoltre nasconde le gambe incluse nel vestito e mostra quelle del corpo che usi (CBBE, ecc.). Se disattivato, alla chiusura del menu tutte le gonne tornano alla lunghezza originale e le gambe aggiunte vengono rimosse."),
     "Elderly": ("Escludi le donne anziane", "Se attivo, le donne anziane (PNG della razza degli anziani) non vengono modificate: la gonna mantiene la lunghezza originale e non si aggiungono gambe."),
     "Shape": "Forma della gonna",
     "Hem": ("Lunghezza della gonna (%)", "Lunghezza dalla cintura all'orlo, dove 100 è l'orlo di un normale vestito lungo del gioco (circa 8 cm dal pavimento). 17: micro mini (la più corta) / 27: appena sotto l'attaccatura della coscia / 43: metà coscia / 49: appena sopra il ginocchio / 56: ginocchio / 100: lunghezza originale. A 100 ogni vestito mantiene lunghezza e forma originali, anche se arriva al pavimento. Le gonne non diventano mai più lunghe, e una gonna già più corta resta com'è."),
@@ -121,7 +121,7 @@ T["ITALIAN"] = {
 
 T["POLISH"] = {
     "General": "Ogólne",
-    "Enabled": ("Włączone", "Po włączeniu spódnice postaci kobiecych są skracane, a pod spódnicą dodawane są nogi ciała (także przy długości 100). Po wyłączeniu, przy zamknięciu menu wszystkie spódnice wracają do pierwotnej długości, a dodane nogi są usuwane."),
+    "Enabled": ("Włączone", "Po włączeniu zmienia się długość spódnic postaci kobiecych. Ponadto nogi dołączone do stroju są ukrywane, a wyświetlane są nogi używanego ciała (CBBE itp.). Po wyłączeniu, przy zamknięciu menu wszystkie spódnice wracają do pierwotnej długości, a dodane nogi są usuwane."),
     "Elderly": ("Pomiń starsze kobiety", "Po włączeniu starsze kobiety (NPC rasy starców) nie są zmieniane: spódnica zachowuje oryginalną długość i nie są dodawane nogi."),
     "Shape": "Kształt spódnicy",
     "Hem": ("Długość spódnicy (%)", "Długość od paska do brzegu, gdzie 100 to brzeg zwykłej długiej sukni z gry (około 8 cm nad podłogą). 17: mikro mini (najkrótsza) / 27: tuż pod nasadą uda / 43: połowa uda / 49: tuż nad kolanem / 56: kolano / 100: oryginalna długość. Przy 100 każdy strój zachowuje oryginalną długość i kształt, nawet sięgający podłogi. Spódnica nigdy nie będzie dłuższa, a spódnica już krótsza zostaje bez zmian."),
@@ -136,7 +136,7 @@ T["POLISH"] = {
 
 T["RUSSIAN"] = {
     "General": "Общие",
-    "Enabled": ("Включено", "Если включено, юбки женских NPC укорачиваются, а под юбкой добавляются ноги тела (и при длине 100). Если выключить, при закрытии меню все юбки вернутся к исходной длине, а добавленные ноги будут убраны."),
+    "Enabled": ("Включено", "Если включено, длина юбок женских NPC меняется. Кроме того, ноги, входящие в одежду, скрываются, и показываются ноги используемого тела (CBBE и т. п.). Если выключить, при закрытии меню все юбки вернутся к исходной длине, а добавленные ноги будут убраны."),
     "Elderly": ("Не трогать пожилых женщин", "Если включить, пожилые женщины (NPC расы стариков) не изменяются: юбка сохраняет исходную длину, ноги не добавляются."),
     "Shape": "Форма юбки",
     "Hem": ("Длина юбки (%)", "Длина от пояса до подола, где 100 — подол обычного длинного платья из игры (около 8 см от пола). 17: микро-мини (самая короткая) / 27: чуть ниже начала бедра / 43: середина бедра / 49: чуть выше колена / 56: колено / 100: исходная длина. При 100 любая одежда сохраняет исходную длину и форму, даже доходящая до пола. Юбка никогда не становится длиннее, а юбка, которая уже короче, остаётся как есть."),
@@ -151,7 +151,7 @@ T["RUSSIAN"] = {
 
 T["CZECH"] = {
     "General": "Obecné",
-    "Enabled": ("Zapnuto", "Po zapnutí se sukně ženských NPC zkrátí a pod sukni se přidají nohy těla (i při délce 100). Po vypnutí se při zavření menu všechny sukně vrátí na původní délku a přidané nohy se odstraní."),
+    "Enabled": ("Zapnuto", "Po zapnutí se změní délka sukní ženských NPC. Navíc se skryjí nohy, které patří k oblečení, a zobrazí se nohy používaného těla (CBBE apod.). Po vypnutí se při zavření menu všechny sukně vrátí na původní délku a přidané nohy se odstraní."),
     "Elderly": ("Vynechat starší ženy", "Po zapnutí se starší ženy (NPC rasy starců) nemění: sukně si ponechá původní délku a nohy se nepřidávají."),
     "Shape": "Tvar sukně",
     "Hem": ("Délka sukně (%)", "Délka od pasu po lem, kde 100 je lem běžných dlouhých šatů ze hry (asi 8 cm nad podlahou). 17: mikro mini (nejkratší) / 27: těsně pod začátkem stehna / 43: polovina stehna / 49: těsně nad kolenem / 56: koleno / 100: původní délka. Při 100 si každé oblečení ponechá původní délku i tvar, i když sahá až na zem. Sukně nikdy nebude delší a sukně, která je už kratší, zůstane, jak je."),
@@ -166,7 +166,7 @@ T["CZECH"] = {
 
 T["CHINESE"] = {  # 簡体字（中国語の枠はゲームに 1 つだけ。利用者の多い簡体字にした）
     "General": "常规",
-    "Enabled": ("启用", "启用后，会缩短女性 NPC 的裙子，并在裙子里加上身体的双腿（长度为 100 时也会加上）。关闭后，关闭菜单时所有裙子会恢复原来的长度，并移除添加的双腿。"),
+    "Enabled": ("启用", "启用后，会改变女性 NPC 的裙长。另外，会隐藏衣服自带的双腿，显示你使用的身体（CBBE 等）的双腿。关闭后，关闭菜单时所有裙子会恢复原来的长度，并移除添加的双腿。"),
     "Elderly": ("排除年长女性", "开启后，不改动年长女性（老年种族的 NPC）：裙子保持原来的长度，也不添加双腿。"),
     "Shape": "裙子形状",
     "Hem": ("裙长（%）", "从腰头到裙摆的长度，以游戏中普通长裙的裙摆（离地约 8 cm）为 100。17: 超短裙（最短）/ 27: 大腿根部稍下 / 43: 大腿中部 / 49: 膝盖稍上 / 56: 膝盖 / 100: 原来的长度。设为 100 时，所有衣服（即使拖到地面）都保持原来的长度和形状。裙子不会变得更长，原本就更短的裙子保持不变。"),
