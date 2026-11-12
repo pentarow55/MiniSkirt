@@ -31,10 +31,10 @@ T = {}
 
 T["JAPANESE"] = {
     "General": "全体",
-    "Enabled": ("有効", "オフにすると、メニューを閉じたときに全員のスカートを元の長さに戻し、足した脚を外します。"),
+    "Enabled": ("有効", "オンにすると、女性 NPC のスカートを短くし、スカートの中に体の脚を足します（丈が 100 のときも脚は足します）。オフにすると、メニューを閉じたときに全員のスカートを元の長さに戻し、足した脚を外します。"),
     "Elderly": ("年配の女性を外す", "オンにすると、年配の女性（種族が年配の NPC）には何もしません。スカートは元の長さのままで、脚も足しません。"),
     "Shape": "スカートの形",
-    "Hem": ("スカート丈（%）", "ウエストバンドからすそまでの長さ。バニラの標準的な長いドレスのすそ（床から約 8 cm）を 100 とします。17: マイクロミニ（最短）/ 27: 太ももの付け根の下 / 43: 太ももの真ん中 / 49: ひざの少し上 / 56: ひざ / 100: 元の長さ。100 では、床まで届く服でも、どの服も長さも形も元のままで、脚だけ体の脚にします。元の服より長くはならず、元のスカートがこの丈より短いときも元のままです。"),
+    "Hem": ("スカート丈（%）", "ウエストバンドからすそまでの長さ。バニラの標準的な長いドレスのすそ（床から約 8 cm）を 100 とします。17: マイクロミニ（最短）/ 27: 太ももの付け根の下 / 43: 太ももの真ん中 / 49: ひざの少し上 / 56: ひざ / 100: 元の長さ。100 では、床まで届く服でも、どの服も長さも形も元のままです。元の服より長くはならず、元のスカートがこの丈より短いときも元のままです。"),
     "HipEase": ("お尻まわりのゆとり", "スカートを、お尻・太もものいちばん外に出ている所からどれだけ離してふくらませるか。お尻がスカートを突き抜けるときは大きくします。0 だと体にぴったりになり、立っているときでも体が突き抜けやすくなります。"),
     "Flare": ("すその広がり角度", "お尻のふくらみより下で、すそを外へ広げる角度（度）。0 だと真下にまっすぐ、大きくするほどすそが広がります。"),
     "Legs": "スカートの中の脚",
@@ -46,10 +46,10 @@ T["JAPANESE"] = {
 
 T["ENGLISH"] = {
     "General": "General",
-    "Enabled": ("Enabled", "When turned off, closing the menu returns every skirt to its original length and removes the added legs."),
+    "Enabled": ("Enabled", "When on, women NPCs' skirts are shortened and the body's legs are added under the skirt (also at length 100). When turned off, closing the menu returns every skirt to its original length and removes the added legs."),
     "Elderly": ("Exclude elderly women", "When on, elderly women (NPCs of the elder race) are left alone: their skirts keep the original length and no legs are added."),
     "Shape": "Skirt Shape",
-    "Hem": ("Skirt length (%)", "Length from the waistband to the hem, where 100 is the hem of a standard long vanilla dress (about 8 cm above the floor). 17: micro mini (shortest) / 27: just below the top of the thigh / 43: mid-thigh / 49: just above the knee / 56: knee / 100: original length. At 100, every outfit keeps its original length and shape, even one that reaches the floor; only the legs are replaced with the body's legs. Skirts never get longer than the original outfit, and a skirt already shorter than this is left as it is."),
+    "Hem": ("Skirt length (%)", "Length from the waistband to the hem, where 100 is the hem of a standard long vanilla dress (about 8 cm above the floor). 17: micro mini (shortest) / 27: just below the top of the thigh / 43: mid-thigh / 49: just above the knee / 56: knee / 100: original length. At 100, every outfit keeps its original length and shape, even one that reaches the floor. Skirts never get longer than the original outfit, and a skirt already shorter than this is left as it is."),
     "HipEase": ("Room around the hips", "How far the skirt stands off from the widest part of the hips and thighs. Increase it if the buttocks poke through the skirt. At 0 the skirt fits skin-tight and the body pokes through more easily, even when standing."),
     "Flare": ("Hem flare angle", "Angle (degrees) at which the skirt spreads outward below the hips. 0 hangs straight down; larger values flare the hem out more."),
     "Legs": "Legs Under the Skirt",
@@ -61,10 +61,10 @@ T["ENGLISH"] = {
 
 T["FRENCH"] = {
     "General": "Général",
-    "Enabled": ("Activé", "Désactivé : à la fermeture du menu, toutes les jupes reprennent leur longueur d'origine et les jambes ajoutées sont retirées."),
+    "Enabled": ("Activé", "Activé : les jupes des PNJ féminins sont raccourcies et les jambes du corps sont ajoutées sous la jupe (même à la longueur 100). Désactivé : à la fermeture du menu, toutes les jupes reprennent leur longueur d'origine et les jambes ajoutées sont retirées."),
     "Elderly": ("Exclure les femmes âgées", "Activé : les femmes âgées (PNJ de la race des anciens) ne sont pas modifiées. Leur jupe garde sa longueur d'origine et aucune jambe n'est ajoutée."),
     "Shape": "Forme de la jupe",
-    "Hem": ("Longueur de la jupe (%)", "Longueur de la ceinture à l'ourlet, 100 étant l'ourlet d'une robe longue standard du jeu (environ 8 cm au-dessus du sol). 17: micro-mini (la plus courte) / 27: juste sous le haut de la cuisse / 43: mi-cuisse / 49: juste au-dessus du genou / 56: genou / 100: longueur d'origine. À 100, chaque tenue garde sa longueur et sa forme d'origine, même si elle touche le sol ; seules les jambes sont remplacées par celles du corps. Une jupe n'est jamais rallongée, et une jupe déjà plus courte reste telle quelle."),
+    "Hem": ("Longueur de la jupe (%)", "Longueur de la ceinture à l'ourlet, 100 étant l'ourlet d'une robe longue standard du jeu (environ 8 cm au-dessus du sol). 17: micro-mini (la plus courte) / 27: juste sous le haut de la cuisse / 43: mi-cuisse / 49: juste au-dessus du genou / 56: genou / 100: longueur d'origine. À 100, chaque tenue garde sa longueur et sa forme d'origine, même si elle touche le sol. Une jupe n'est jamais rallongée, et une jupe déjà plus courte reste telle quelle."),
     "HipEase": ("Aisance aux hanches", "Distance entre la jupe et la partie la plus large des hanches et des cuisses. Augmentez si les fesses traversent la jupe. À 0, la jupe colle au corps et le corps la traverse plus facilement, même debout."),
     "Flare": ("Évasement de l'ourlet", "Angle (degrés) d'évasement de la jupe sous les hanches. 0 tombe droit ; plus la valeur est grande, plus l'ourlet s'évase."),
     "Legs": "Jambes sous la jupe",
@@ -76,10 +76,10 @@ T["FRENCH"] = {
 
 T["GERMAN"] = {
     "General": "Allgemein",
-    "Enabled": ("Aktiviert", "Wenn aus: Beim Schließen des Menüs bekommen alle Röcke wieder ihre ursprüngliche Länge, und die hinzugefügten Beine werden entfernt."),
+    "Enabled": ("Aktiviert", "Wenn an: Die Röcke weiblicher NPCs werden gekürzt, und unter dem Rock werden die Beine des Körpers ergänzt (auch bei Länge 100). Wenn aus: Beim Schließen des Menüs bekommen alle Röcke wieder ihre ursprüngliche Länge, und die hinzugefügten Beine werden entfernt."),
     "Elderly": ("Ältere Frauen ausnehmen", "Wenn an: Ältere Frauen (NPCs der Rasse der Alten) bleiben unverändert. Ihr Rock behält die ursprüngliche Länge, und es werden keine Beine hinzugefügt."),
     "Shape": "Rockform",
-    "Hem": ("Rocklänge (%)", "Länge vom Bund bis zum Saum, wobei 100 der Saum eines normalen langen Kleides aus dem Spiel ist (etwa 8 cm über dem Boden). 17: Mikro-Mini (am kürzesten) / 27: knapp unter dem Oberschenkelansatz / 43: Mitte des Oberschenkels / 49: knapp über dem Knie / 56: Knie / 100: ursprüngliche Länge. Bei 100 behält jede Kleidung Länge und Form, auch wenn sie bis zum Boden reicht; nur die Beine werden durch die des Körpers ersetzt. Röcke werden nie länger, und ein Rock, der schon kürzer ist, bleibt wie er ist."),
+    "Hem": ("Rocklänge (%)", "Länge vom Bund bis zum Saum, wobei 100 der Saum eines normalen langen Kleides aus dem Spiel ist (etwa 8 cm über dem Boden). 17: Mikro-Mini (am kürzesten) / 27: knapp unter dem Oberschenkelansatz / 43: Mitte des Oberschenkels / 49: knapp über dem Knie / 56: Knie / 100: ursprüngliche Länge. Bei 100 behält jede Kleidung Länge und Form, auch wenn sie bis zum Boden reicht. Röcke werden nie länger, und ein Rock, der schon kürzer ist, bleibt wie er ist."),
     "HipEase": ("Weite an der Hüfte", "Abstand des Rocks zur breitesten Stelle von Hüfte und Oberschenkeln. Erhöhen, wenn der Po durch den Rock ragt. Bei 0 liegt der Rock hauteng an, und der Körper ragt leichter durch, selbst im Stehen."),
     "Flare": ("Ausstellwinkel des Saums", "Winkel (Grad), in dem der Rock unterhalb der Hüfte nach außen geht. 0 fällt gerade nach unten; größere Werte stellen den Saum weiter aus."),
     "Legs": "Beine unter dem Rock",
@@ -91,10 +91,10 @@ T["GERMAN"] = {
 
 T["SPANISH"] = {
     "General": "General",
-    "Enabled": ("Activado", "Si se desactiva, al cerrar el menú todas las faldas vuelven a su largo original y se quitan las piernas añadidas."),
+    "Enabled": ("Activado", "Si está activado, las faldas de las PNJ se acortan y se añaden las piernas del cuerpo bajo la falda (también con largo 100). Si se desactiva, al cerrar el menú todas las faldas vuelven a su largo original y se quitan las piernas añadidas."),
     "Elderly": ("Excluir a las ancianas", "Si se activa, las ancianas (PNJ de la raza de los ancianos) no se modifican: su falda conserva el largo original y no se añaden piernas."),
     "Shape": "Forma de la falda",
-    "Hem": ("Largo de la falda (%)", "Largo desde la cinturilla hasta el bajo, siendo 100 el bajo de un vestido largo normal del juego (unos 8 cm sobre el suelo). 17: micro mini (la más corta) / 27: justo bajo el inicio del muslo / 43: mitad del muslo / 49: justo sobre la rodilla / 56: rodilla / 100: largo original. Con 100, toda la ropa conserva su largo y forma originales, aunque llegue al suelo; solo se cambian las piernas por las del cuerpo. Las faldas nunca quedan más largas, y una falda ya más corta se deja como está."),
+    "Hem": ("Largo de la falda (%)", "Largo desde la cinturilla hasta el bajo, siendo 100 el bajo de un vestido largo normal del juego (unos 8 cm sobre el suelo). 17: micro mini (la más corta) / 27: justo bajo el inicio del muslo / 43: mitad del muslo / 49: justo sobre la rodilla / 56: rodilla / 100: largo original. Con 100, toda la ropa conserva su largo y forma originales, aunque llegue al suelo. Las faldas nunca quedan más largas, y una falda ya más corta se deja como está."),
     "HipEase": ("Holgura en las caderas", "Distancia entre la falda y la parte más ancha de caderas y muslos. Auméntala si los glúteos atraviesan la falda. Con 0 la falda queda pegada al cuerpo y este la atraviesa con más facilidad, incluso de pie."),
     "Flare": ("Ángulo de vuelo del bajo", "Ángulo (grados) con que la falda se abre bajo las caderas. 0 cae recta; valores mayores abren más el bajo."),
     "Legs": "Piernas bajo la falda",
@@ -106,10 +106,10 @@ T["SPANISH"] = {
 
 T["ITALIAN"] = {
     "General": "Generale",
-    "Enabled": ("Attivo", "Se disattivato, alla chiusura del menu tutte le gonne tornano alla lunghezza originale e le gambe aggiunte vengono rimosse."),
+    "Enabled": ("Attivo", "Se attivo, le gonne dei PNG femminili vengono accorciate e sotto la gonna vengono aggiunte le gambe del corpo (anche con lunghezza 100). Se disattivato, alla chiusura del menu tutte le gonne tornano alla lunghezza originale e le gambe aggiunte vengono rimosse."),
     "Elderly": ("Escludi le donne anziane", "Se attivo, le donne anziane (PNG della razza degli anziani) non vengono modificate: la gonna mantiene la lunghezza originale e non si aggiungono gambe."),
     "Shape": "Forma della gonna",
-    "Hem": ("Lunghezza della gonna (%)", "Lunghezza dalla cintura all'orlo, dove 100 è l'orlo di un normale vestito lungo del gioco (circa 8 cm dal pavimento). 17: micro mini (la più corta) / 27: appena sotto l'attaccatura della coscia / 43: metà coscia / 49: appena sopra il ginocchio / 56: ginocchio / 100: lunghezza originale. A 100 ogni vestito mantiene lunghezza e forma originali, anche se arriva al pavimento; vengono sostituite solo le gambe con quelle del corpo. Le gonne non diventano mai più lunghe, e una gonna già più corta resta com'è."),
+    "Hem": ("Lunghezza della gonna (%)", "Lunghezza dalla cintura all'orlo, dove 100 è l'orlo di un normale vestito lungo del gioco (circa 8 cm dal pavimento). 17: micro mini (la più corta) / 27: appena sotto l'attaccatura della coscia / 43: metà coscia / 49: appena sopra il ginocchio / 56: ginocchio / 100: lunghezza originale. A 100 ogni vestito mantiene lunghezza e forma originali, anche se arriva al pavimento. Le gonne non diventano mai più lunghe, e una gonna già più corta resta com'è."),
     "HipEase": ("Agio sui fianchi", "Distanza della gonna dal punto più largo di fianchi e cosce. Aumentala se i glutei attraversano la gonna. A 0 la gonna aderisce al corpo e il corpo la attraversa più facilmente, anche da in piedi."),
     "Flare": ("Svasatura dell'orlo", "Angolo (gradi) con cui la gonna si allarga sotto i fianchi. 0 scende dritta; valori più alti allargano di più l'orlo."),
     "Legs": "Gambe sotto la gonna",
@@ -121,10 +121,10 @@ T["ITALIAN"] = {
 
 T["POLISH"] = {
     "General": "Ogólne",
-    "Enabled": ("Włączone", "Po wyłączeniu, przy zamknięciu menu wszystkie spódnice wracają do pierwotnej długości, a dodane nogi są usuwane."),
+    "Enabled": ("Włączone", "Po włączeniu spódnice postaci kobiecych są skracane, a pod spódnicą dodawane są nogi ciała (także przy długości 100). Po wyłączeniu, przy zamknięciu menu wszystkie spódnice wracają do pierwotnej długości, a dodane nogi są usuwane."),
     "Elderly": ("Pomiń starsze kobiety", "Po włączeniu starsze kobiety (NPC rasy starców) nie są zmieniane: spódnica zachowuje oryginalną długość i nie są dodawane nogi."),
     "Shape": "Kształt spódnicy",
-    "Hem": ("Długość spódnicy (%)", "Długość od paska do brzegu, gdzie 100 to brzeg zwykłej długiej sukni z gry (około 8 cm nad podłogą). 17: mikro mini (najkrótsza) / 27: tuż pod nasadą uda / 43: połowa uda / 49: tuż nad kolanem / 56: kolano / 100: oryginalna długość. Przy 100 każdy strój zachowuje oryginalną długość i kształt, nawet sięgający podłogi; zamieniane są tylko nogi na nogi ciała. Spódnica nigdy nie będzie dłuższa, a spódnica już krótsza zostaje bez zmian."),
+    "Hem": ("Długość spódnicy (%)", "Długość od paska do brzegu, gdzie 100 to brzeg zwykłej długiej sukni z gry (około 8 cm nad podłogą). 17: mikro mini (najkrótsza) / 27: tuż pod nasadą uda / 43: połowa uda / 49: tuż nad kolanem / 56: kolano / 100: oryginalna długość. Przy 100 każdy strój zachowuje oryginalną długość i kształt, nawet sięgający podłogi. Spódnica nigdy nie będzie dłuższa, a spódnica już krótsza zostaje bez zmian."),
     "HipEase": ("Luz na biodrach", "Jak daleko spódnica odstaje od najszerszego miejsca bioder i ud. Zwiększ, jeśli pośladki przebijają spódnicę. Przy 0 spódnica przylega do ciała i ciało łatwiej ją przebija, nawet na stojąco."),
     "Flare": ("Kąt rozkloszowania", "Kąt (stopnie), pod jakim spódnica rozchodzi się poniżej bioder. 0 opada prosto; większe wartości bardziej rozszerzają brzeg."),
     "Legs": "Nogi pod spódnicą",
@@ -136,10 +136,10 @@ T["POLISH"] = {
 
 T["RUSSIAN"] = {
     "General": "Общие",
-    "Enabled": ("Включено", "Если выключить, при закрытии меню все юбки вернутся к исходной длине, а добавленные ноги будут убраны."),
+    "Enabled": ("Включено", "Если включено, юбки женских NPC укорачиваются, а под юбкой добавляются ноги тела (и при длине 100). Если выключить, при закрытии меню все юбки вернутся к исходной длине, а добавленные ноги будут убраны."),
     "Elderly": ("Не трогать пожилых женщин", "Если включить, пожилые женщины (NPC расы стариков) не изменяются: юбка сохраняет исходную длину, ноги не добавляются."),
     "Shape": "Форма юбки",
-    "Hem": ("Длина юбки (%)", "Длина от пояса до подола, где 100 — подол обычного длинного платья из игры (около 8 см от пола). 17: микро-мини (самая короткая) / 27: чуть ниже начала бедра / 43: середина бедра / 49: чуть выше колена / 56: колено / 100: исходная длина. При 100 любая одежда сохраняет исходную длину и форму, даже доходящая до пола; заменяются только ноги на ноги тела. Юбка никогда не становится длиннее, а юбка, которая уже короче, остаётся как есть."),
+    "Hem": ("Длина юбки (%)", "Длина от пояса до подола, где 100 — подол обычного длинного платья из игры (около 8 см от пола). 17: микро-мини (самая короткая) / 27: чуть ниже начала бедра / 43: середина бедра / 49: чуть выше колена / 56: колено / 100: исходная длина. При 100 любая одежда сохраняет исходную длину и форму, даже доходящая до пола. Юбка никогда не становится длиннее, а юбка, которая уже короче, остаётся как есть."),
     "HipEase": ("Свобода на бёдрах", "Насколько юбка отстоит от самой широкой части бёдер. Увеличьте, если ягодицы проходят сквозь юбку. При 0 юбка прилегает вплотную, и тело легче проходит сквозь неё, даже стоя."),
     "Flare": ("Угол расклёшенности", "Угол (градусы), под которым юбка расходится ниже бёдер. 0 — прямо вниз; чем больше, тем шире подол."),
     "Legs": "Ноги под юбкой",
@@ -151,10 +151,10 @@ T["RUSSIAN"] = {
 
 T["CZECH"] = {
     "General": "Obecné",
-    "Enabled": ("Zapnuto", "Po vypnutí se při zavření menu všechny sukně vrátí na původní délku a přidané nohy se odstraní."),
+    "Enabled": ("Zapnuto", "Po zapnutí se sukně ženských NPC zkrátí a pod sukni se přidají nohy těla (i při délce 100). Po vypnutí se při zavření menu všechny sukně vrátí na původní délku a přidané nohy se odstraní."),
     "Elderly": ("Vynechat starší ženy", "Po zapnutí se starší ženy (NPC rasy starců) nemění: sukně si ponechá původní délku a nohy se nepřidávají."),
     "Shape": "Tvar sukně",
-    "Hem": ("Délka sukně (%)", "Délka od pasu po lem, kde 100 je lem běžných dlouhých šatů ze hry (asi 8 cm nad podlahou). 17: mikro mini (nejkratší) / 27: těsně pod začátkem stehna / 43: polovina stehna / 49: těsně nad kolenem / 56: koleno / 100: původní délka. Při 100 si každé oblečení ponechá původní délku i tvar, i když sahá až na zem; vymění se jen nohy za nohy těla. Sukně nikdy nebude delší a sukně, která je už kratší, zůstane, jak je."),
+    "Hem": ("Délka sukně (%)", "Délka od pasu po lem, kde 100 je lem běžných dlouhých šatů ze hry (asi 8 cm nad podlahou). 17: mikro mini (nejkratší) / 27: těsně pod začátkem stehna / 43: polovina stehna / 49: těsně nad kolenem / 56: koleno / 100: původní délka. Při 100 si každé oblečení ponechá původní délku i tvar, i když sahá až na zem. Sukně nikdy nebude delší a sukně, která je už kratší, zůstane, jak je."),
     "HipEase": ("Volnost v bocích", "Jak daleko sukně odstává od nejširšího místa boků a stehen. Zvyšte, pokud hýždě prochází sukní. Při 0 sukně těsně přiléhá a tělo jí snáze prochází, i ve stoje."),
     "Flare": ("Úhel rozšíření lemu", "Úhel (stupně), pod kterým se sukně pod boky rozšiřuje. 0 padá rovně dolů; větší hodnoty lem více rozšíří."),
     "Legs": "Nohy pod sukní",
@@ -166,10 +166,10 @@ T["CZECH"] = {
 
 T["CHINESE"] = {  # 簡体字（中国語の枠はゲームに 1 つだけ。利用者の多い簡体字にした）
     "General": "常规",
-    "Enabled": ("启用", "关闭后，关闭菜单时所有裙子会恢复原来的长度，并移除添加的双腿。"),
+    "Enabled": ("启用", "启用后，会缩短女性 NPC 的裙子，并在裙子里加上身体的双腿（长度为 100 时也会加上）。关闭后，关闭菜单时所有裙子会恢复原来的长度，并移除添加的双腿。"),
     "Elderly": ("排除年长女性", "开启后，不改动年长女性（老年种族的 NPC）：裙子保持原来的长度，也不添加双腿。"),
     "Shape": "裙子形状",
-    "Hem": ("裙长（%）", "从腰头到裙摆的长度，以游戏中普通长裙的裙摆（离地约 8 cm）为 100。17: 超短裙（最短）/ 27: 大腿根部稍下 / 43: 大腿中部 / 49: 膝盖稍上 / 56: 膝盖 / 100: 原来的长度。设为 100 时，所有衣服（即使拖到地面）都保持原来的长度和形状，只把双腿换成身体的双腿。裙子不会变得更长，原本就更短的裙子保持不变。"),
+    "Hem": ("裙长（%）", "从腰头到裙摆的长度，以游戏中普通长裙的裙摆（离地约 8 cm）为 100。17: 超短裙（最短）/ 27: 大腿根部稍下 / 43: 大腿中部 / 49: 膝盖稍上 / 56: 膝盖 / 100: 原来的长度。设为 100 时，所有衣服（即使拖到地面）都保持原来的长度和形状。裙子不会变得更长，原本就更短的裙子保持不变。"),
     "HipEase": ("臀部宽松度", "裙子与臀部和大腿最宽处的距离。臀部穿出裙子时请调大。设为 0 时裙子紧贴身体，即使站着身体也更容易穿出。"),
     "Flare": ("裙摆张开角度", "臀部以下裙子向外张开的角度（度）。0 为垂直向下，数值越大裙摆越张开。"),
     "Legs": "裙下的双腿",
