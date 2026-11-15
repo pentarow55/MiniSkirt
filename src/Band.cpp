@@ -55,6 +55,29 @@ namespace Band
 
 		// 腕の骨（上腕・前腕・手・指）の印（皮の骨の番号ごと）。帯の上端を腰まで上げると、体 nif の手首（前腕）が帯の高さに入るので、
 		// 帯からも服の脚を消す所からも外す。見分けは Skyrim の人型の骨格に共通の骨の名前（服・体の名前は見ない）
+		// 骨の名前（小文字）が腕・手・指・袖の骨か。部分一致だが、別の単語の中の "arm" / "hand" は外す:
+		//  "arm" の直前が f / h / w（farm・harm・warm・charm・swarm。Vanilla SMP Clothing の農民の服の揺れ骨 farm1Belt など）、
+		//  直後が "or" / "y"（armor・armour・army）。"hand" の直後が "le" / "ker"（handle・handkerchief）。
+		//  袖の揺れ骨（farm1SleevL・emperorSleeveR など）は腕に入れない（ほかの服の袖と同じく、前腕の重み・位置で袖と見分ける）
+		bool IsArmBoneName(std::string_view a_s)
+		{
+			auto any = [&](std::string_view a_word, auto&& a_skip) {
+				for (auto p = a_s.find(a_word); p != std::string_view::npos; p = a_s.find(a_word, p + 1)) {
+					const char        prev = p > 0 ? a_s[p - 1] : '\0';
+					const std::string_view next = a_s.substr(p + a_word.size());
+					if (!a_skip(prev, next)) {
+						return true;
+					}
+				}
+				return false;
+			};
+			const auto never = [](char, std::string_view) { return false; };
+			return any("arm", [](char a_prev, std::string_view a_next) {
+				return a_prev == 'f' || a_prev == 'h' || a_prev == 'w' || a_next.starts_with("or") || a_next.starts_with("y");
+			}) || any("hand", [](char, std::string_view a_next) { return a_next.starts_with("le") || a_next.starts_with("ker"); }) ||
+			       any("finger", never);
+		}
+
 		std::vector<char> ArmBones(RE::NiSkinInstance* a_skin)
 		{
 			std::vector<char> out;
@@ -79,7 +102,7 @@ namespace Band
 					const auto sp = s.find(' ');
 					s = sp == std::string::npos ? std::string{} : s.substr(sp + 1);
 				}
-				out[i] = s.find("arm") != std::string::npos || s.find("hand") != std::string::npos || s.find("finger") != std::string::npos;
+				out[i] = IsArmBoneName(s);
 			}
 			return out;
 		}
