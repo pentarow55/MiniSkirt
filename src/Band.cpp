@@ -72,6 +72,13 @@ namespace Band
 				for (auto& c : s) {
 					c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 				}
+				// HDT-SMP / FSMP は服の中の揺れ骨（骨格に無い骨）の名前を "hdtSSEPhysics_AutoRename_Armor_XXXXXXXX <元の名前>" に変える。
+				// そのまま見ると "Armor" の "arm" に当たり、SMP のスカートの骨が全部腕の骨になって袖と判定される。元の名前で見る
+				constexpr std::string_view kAutoRename = "hdtssephysics_autorename_";
+				if (s.rfind(kAutoRename, 0) == 0) {
+					const auto sp = s.find(' ');
+					s = sp == std::string::npos ? std::string{} : s.substr(sp + 1);
+				}
 				out[i] = s.find("arm") != std::string::npos || s.find("hand") != std::string::npos || s.find("finger") != std::string::npos;
 			}
 			return out;
