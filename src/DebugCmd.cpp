@@ -11,6 +11,7 @@
 //   @fov <度>                            視野角
 //   @freeze <0|1>                        自由カメラに入り直して、時間を止める／動かす（tfc 1 と同じ）
 //   @where <参照の FormID(16進)|player|cam>  位置と向きを結果ファイルに書く（構図を決める用）
+//   @dump <NPC の参照>                    皮付きの shape の頂点と面を OBJ に書く（_rest: 初めの姿勢、_posed: いまの骨で皮を付けた形）
 //   @actors                              近くの NPC の参照・位置・性別・名前を結果ファイルに書く
 //   @place <参照> <x> <y> <z> <向き(度)>  参照を同じセルの中の位置に置き、向きを決める
 //   @npc <名前の一部>                     表示名で NPC のベースを探し、ベースの FormID・性別・名前を書く
@@ -22,6 +23,7 @@
 
 #include "PCH.h"
 
+#include "Band.h"
 #include "DevFlags.h"
 
 #include <chrono>
@@ -190,6 +192,93 @@ namespace DebugCmd
 				}
 				const auto p = ref->GetPosition();
 				Result(std::format("where {} {:.1f} {:.1f} {:.1f} {:.1f}", arg, p.x, p.y, p.z, ref->GetAngleZ() * 180.0f / 3.14159265f));
+			} else if (a_line.rfind("@dump ", 0) == 0) {
+				// NPC の皮付きの shape の頂点と面を OBJ に書く（形をゲームの外で見る用）。
+				//  MiniSkirt_dump_<参照>_rest.obj: 頂点バッファの座標（書き換えたあと）＋ FrameOffset（初めの姿勢）
+				//  MiniSkirt_dump_<参照>_posed.obj: 今の骨の位置で皮を付けた座標を、NPC の 3D の根の座標に直したもの（見えている形）
+				const auto arg = a_line.substr(6);
+				auto       actor = RE::TESForm::LookupByID<RE::Actor>(static_cast<RE::FormID>(std::stoul(arg, nullptr, 16)));
+				auto       root = actor ? actor->Get3D(false) : nullptr;
+				if (!root) {
+					Result("dump-failed " + arg);
+					return;
+				}
+				std::ofstream rest(Dir() / std::format("MiniSkirt_dump_{}_rest.obj", arg));
+				std::ofstream posed(Dir() / std::format("MiniSkirt_dump_{}_posed.obj", arg));
+				const auto    inv = root->world.Invert();
+				std::size_t   base = 1;
+				int           shapes = 0;
+				RE::BSVisit::TraverseScenegraphGeometries(root, [&](RE::BSGeometry* g) {
+					auto skin = g->GetGeometryRuntimeData().skinInstance.get();
+					auto part = skin ? skin->skinPartition.get() : nullptr;
+					auto data = skin ? skin->skinData.get() : nullptr;
+					auto buf = part && part->numPartitions ? part->partitions[0].buffData : nullptr;
+					if (!buf || !buf->rawVertexData || !data) {
+						return RE::BSVisit::BSVisitControl::kContinue;
+					}
+					auto       desc = buf->vertexDesc;
+					const auto stride = desc.GetSize();
+					const auto n = part->vertexCount;
+					const bool skinned = desc.HasFlag(RE::BSGraphics::Vertex::VF_SKINNED);
+					const auto offS = desc.GetAttributeOffset(RE::BSGraphics::Vertex::VA_SKINNING);
+					const auto nb = data->GetBoneCount();
+					const auto fo = Band::FrameOffset(g);
+					std::string nm = g->name.c_str();
+					for (auto& c : nm) {
+						c = c == ' ' ? '_' : c;
+					}
+					if (g->GetFlags().any(RE::NiAVObject::Flag::kHidden)) {
+						nm += "_hidden";
+					}
+					rest << "o " << nm << "\n";
+					posed << "o " << nm << "\n";
+					auto half = [](std::uint16_t h) {
+						const std::uint32_t s = (h >> 15) & 1, e = (h >> 10) & 0x1F, m = h & 0x3FF;
+						float f = e == 0 ? std::ldexp(static_cast<float>(m), -24) : (e == 31 ? 0.0f : std::ldexp(static_cast<float>(m | 0x400), static_cast<int>(e) - 25));
+						return s ? -f : f;
+					};
+					for (std::uint32_t v = 0; v < n; ++v) {
+						const auto*  vp = buf->rawVertexData + static_cast<std::size_t>(v) * stride;
+						const float* f = reinterpret_cast<const float*>(vp);
+						rest << std::format("v {:.4f} {:.4f} {:.4f}\n", f[0] + fo[0], f[1] + fo[1], f[2] + fo[2]);
+						RE::NiPoint3 p{ 0.0f, 0.0f, 0.0f };
+						if (skinned && offS + 12 <= stride) {
+							for (int k = 0; k < 4; ++k) {
+								std::uint16_t h;
+								std::memcpy(&h, vp + offS + k * 2, 2);
+								const float w = half(h);
+								const auto  li = vp[offS + 8 + k];
+								if (w <= 0.0f || li >= nb || !skin->bones[li]) {
+									continue;
+								}
+								const auto t = skin->bones[li]->world * data->GetBoneDataSkinToBone(li);
+								p += (t * RE::NiPoint3{ f[0], f[1], f[2] }) * w;
+							}
+							p = inv * p;
+						}
+						posed << std::format("v {:.4f} {:.4f} {:.4f}\n", p.x, p.y, p.z);
+					}
+					for (std::uint32_t i = 0; i < part->numPartitions; ++i) {
+						auto& pp = part->partitions[i];
+						if (!pp.buffData || !pp.buffData->rawIndexData) {
+							continue;
+						}
+						const auto* ix = pp.buffData->rawIndexData;
+						for (std::uint32_t t = 0; t < pp.triangles; ++t) {
+							const auto a = ix[t * 3], b = ix[t * 3 + 1], c = ix[t * 3 + 2];
+							if (a >= n || b >= n || c >= n || (a == b && b == c)) {
+								continue;
+							}
+							const auto line = std::format("f {} {} {}\n", base + a, base + b, base + c);
+							rest << line;
+							posed << line;
+						}
+					}
+					base += n;
+					++shapes;
+					return RE::BSVisit::BSVisitControl::kContinue;
+				});
+				Result(std::format("dump {} {}", arg, shapes));
 			} else if (a_line == "@actors") {
 				// 読み込み済みの NPC（プレイヤー以外）を「actor 参照 x y z 女性 名前」で書く（下見で人の集まる所を探す用）
 				if (auto pl = RE::ProcessLists::GetSingleton()) {
