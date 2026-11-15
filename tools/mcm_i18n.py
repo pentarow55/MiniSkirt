@@ -15,7 +15,7 @@ LAYOUT = [
     {"type": "toggle", "key": "Elderly", "id": "bExcludeElderly:General"},
     {"type": "empty"},
     {"type": "header", "key": "Shape"},
-    {"type": "slider", "key": "Hem", "id": "fSkirtLength:General", "min": 5, "max": 100, "step": 1, "fmt": "{0}"},
+    {"type": "slider", "key": "Hem", "id": "fSkirtLength:General", "min": 10, "max": 100, "step": 1, "fmt": "{0}"},
     {"type": "slider", "key": "HipEase", "id": "fHipEase:General", "min": 0, "max": 8, "step": 0.5, "fmt": "{1}"},
     {"type": "slider", "key": "Flare", "id": "fFlareAngle:General", "min": 0, "max": 30, "step": 1, "fmt": "{0}"},
     {"type": "header", "key": "Legs", "position": 1},
