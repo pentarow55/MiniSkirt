@@ -1745,6 +1745,29 @@ namespace Band
 			}
 		}
 		auto base = a_actor->GetActorBase();
+		// 帯の肌の shape のうち、いちばん頂点の多い物を体の本体とみなす。本体と違うテクスチャの肌の shape
+		// （3BA の股・お尻は femalebody_etc_v2 を使う）は、テクスチャを保って色だけ合わせる（体のテクスチャを貼ると色・形が崩れる）
+		auto skinProp = [](RE::NiAVObject* a_obj) -> RE::BSLightingShaderProperty* {
+			auto g = a_obj ? a_obj->AsGeometry() : nullptr;
+			auto p = g ? netimmerse_cast<RE::BSLightingShaderProperty*>(g->GetGeometryRuntimeData().shaderProperty.get()) : nullptr;
+			return p && p->material && p->material->GetFeature() == RE::BSShaderMaterial::Feature::kFaceGenRGBTint ? p : nullptr;
+		};
+		auto lower = [](std::string a_s) {
+			std::ranges::transform(a_s, a_s.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+			return a_s;
+		};
+		std::string   mainTex;
+		std::uint32_t mainVerts = 0;
+		for (auto& s : it->second.shapes) {
+			auto p = skinProp(s.get());
+			auto skin = p ? s->AsGeometry()->GetGeometryRuntimeData().skinInstance.get() : nullptr;
+			auto part = skin ? skin->skinPartition.get() : nullptr;
+			const std::uint32_t nv = part ? part->vertexCount : 0;
+			if (p && (mainTex.empty() || nv > mainVerts)) {
+				mainVerts = nv;
+				mainTex = lower(TexPath(p->material));
+			}
+		}
 		for (auto& s : it->second.shapes) {
 			auto geo = s ? s->AsGeometry() : nullptr;
 			auto prop = geo ? netimmerse_cast<RE::BSLightingShaderProperty*>(geo->GetGeometryRuntimeData().shaderProperty.get()) : nullptr;
@@ -1759,6 +1782,26 @@ namespace Band
 			if (propShared) {
 				// SetMaterial は property ごとなので、property が共有だと全員変わる。変えずに残す
 				logger::info("  帯の肌: [{}] property がほかの NPC と共有なので変えない（全員の色が変わるため）", geo->name.c_str());
+				continue;
+			}
+			if (lower(TexPath(prop->material)) != mainTex) {
+				// 体の本体と別のテクスチャ: 自分の材質の写し（この NPC 専用）にして、色だけを服の肌か NPC の体の色から写す
+				auto own = prop->material;
+				prop->SetMaterial(own, true);
+				if (prop->material == own && matShared) {
+					logger::info("  帯の肌: [{}] 体の本体と別のテクスチャ。材質を写しにできなかった（共有のまま）ので変えない", geo->name.c_str());
+					continue;
+				}
+				auto mat = static_cast<RE::BSLightingShaderMaterialFacegenTint*>(prop->material);
+				auto srcMat = src ? src->GetGeometryRuntimeData().shaderProperty->material : nullptr;
+				if (srcMat) {
+					mat->tintColor = static_cast<RE::BSLightingShaderMaterialFacegenTint*>(srcMat)->tintColor;
+				} else if (base) {
+					const auto& c = base->bodyTintColor;
+					mat->tintColor = RE::NiColor(c.red / 255.0f, c.green / 255.0f, c.blue / 255.0f);
+				}
+				logger::info("  帯の肌: [{}] 体の本体（{}）と別のテクスチャなので、テクスチャは変えず色だけ{}から写した（色 {}、テクスチャ {}）", geo->name.c_str(), mainTex,
+					srcMat ? "服の肌" : "NPC の体の色", TintText(mat), TexPath(mat));
 				continue;
 			}
 			if (src) {
