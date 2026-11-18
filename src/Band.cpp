@@ -32,6 +32,7 @@ namespace Band
 			RE::TESObjectARMA*                         arma{ nullptr };  // 帯の体の ArmorAddon（肌のテクスチャの予備に使う）
 			bool                                       skinDone{ false };  // 肌の色・テクスチャを NPC に合わせた
 			std::string                                src;  // 下着の nif（空なら裸の体だけ）。変わったら付け直す
+			int                                        weight{ 100 };  // 帯の体を混ぜた体重（10 刻み）
 		};
 		std::unordered_map<RE::FormID, State> g_state;
 
@@ -651,6 +652,9 @@ namespace Band
 		// スカートはお尻のあたりで体から 1 以上離してあるので、寄せた下着はどの服の下でも内側に収まる（立体的な飾りがスカートを突き抜けない）。
 		// 頂点は元の nif と共有なので、頂点の写しと頂点バッファを自前で作る（面・骨・重みの配列は元と共有）。
 		// 寄せる頂点が無ければ nullptr（a_why は空）。作れなければ nullptr と理由
+		RE::NiSkinPartition* MakeMovedPartition(RE::NiSkinPartition* a_orig, const std::vector<std::array<float, 3>>& a_pos, const std::vector<char>& a_hit,
+			std::string& a_why);
+
 		RE::NiSkinPartition* MakeTuckedPartition(RE::NiSkinPartition* a_orig, float a_zOff, const std::vector<SkinPt>& a_skin, float a_limit, std::string& a_why,
 			int& a_moved, float& a_maxMove)
 		{
@@ -747,6 +751,57 @@ namespace Band
 			if (!a_moved) {
 				return nullptr;
 			}
+			return MakeMovedPartition(a_orig, moved, hit, a_why);
+		}
+
+		// a_hit の頂点の位置だけ a_pos に置き換えた自前の skinPartition を作る。頂点の写しと頂点バッファは自前（面・骨・重みの配列は a_orig と共有）。
+		// 区画ごとに buffData が別で、頂点バッファの大きさが頂点の数どおりであること。作れなければ nullptr と理由
+		RE::NiSkinPartition* MakeMovedPartition(RE::NiSkinPartition* a_orig, const std::vector<std::array<float, 3>>& a_pos, const std::vector<char>& a_hit,
+			std::string& a_why)
+		{
+			auto rtti = a_orig->GetRTTI();
+			if (!rtti || !rtti->GetName() || std::string_view(rtti->GetName()) != "NiSkinPartition") {
+				a_why = "skinPartition の型が NiSkinPartition でない";
+				return nullptr;
+			}
+			auto dev = Device();
+			if (!dev) {
+				a_why = "D3D11 のデバイスが無い";
+				return nullptr;
+			}
+			const std::uint32_t np = a_orig->numPartitions;
+			const std::uint32_t nv = a_orig->vertexCount;
+			if (!np || a_orig->partitions.size() != np || !nv || a_pos.size() != nv || a_hit.size() != nv) {
+				a_why = std::format("区画・頂点の数が合わない（区画 {}・{}、頂点 {}・{}）", np, a_orig->partitions.size(), nv, a_pos.size());
+				return nullptr;
+			}
+			auto b0 = a_orig->partitions[0].buffData;
+			if (!b0 || !b0->rawVertexData || !b0->vertexBuffer) {
+				a_why = "頂点のデータが無い";
+				return nullptr;
+			}
+			const auto            stride = b0->vertexDesc.GetSize();
+			std::set<const void*> bufs;
+			for (std::uint32_t i = 0; i < np; ++i) {
+				auto b = a_orig->partitions[i].buffData;
+				if (!b || !b->rawVertexData || !b->vertexBuffer || !b->indexBuffer || b->vertexDesc.GetSize() != stride) {
+					a_why = std::format("区画{} の頂点のデータが無い・作りが違う", i);
+					return nullptr;
+				}
+				D3D11_BUFFER_DESC vbd{};
+				reinterpret_cast<ID3D11Buffer*>(b->vertexBuffer)->GetDesc(&vbd);
+				if (vbd.ByteWidth != static_cast<UINT>(nv) * stride) {
+					a_why = std::format("区画{} の頂点バッファの大きさが頂点の数と合わない（{} バイト、頂点 {}）", i, vbd.ByteWidth, nv);
+					return nullptr;
+				}
+				bufs.insert(b);
+			}
+			if (bufs.size() != np) {
+				a_why = "区画どうしで buffData を共有している";
+				return nullptr;
+			}
+			const auto& moved = a_pos;
+			const auto& hit = a_hit;
 			// 頂点の写し（区画ごと）と頂点バッファ（区画で共有、元と同じ作り）
 			std::vector<std::uint8_t*> raws(np, nullptr);
 			for (std::uint32_t i = 0; i < np; ++i) {
@@ -807,9 +862,84 @@ namespace Band
 		}
 
 		// ファイル無しの帯を用意する（体 nif ごとに 1 回）。失敗したら nullptr（a_why に理由）
-		Fileless* GetFileless(const char* a_path, int a_zLo, int a_zHi, std::string& a_why)
+		// 体 nif の対（_0 と _1）のもう片方のパス。対になっていない名前なら空。a_isOne に、a_path が _1 の方か
+		std::string WeightPair(const std::string& a_path, bool& a_isOne)
 		{
-			const auto key = std::format("{}|{}|{}", Lower(a_path), a_zLo, a_zHi);
+			const auto low = Lower(a_path);
+			if (low.size() < 6 || low.compare(low.size() - 4, 4, ".nif") != 0 || low[low.size() - 6] != '_') {
+				return {};
+			}
+			const char c = low[low.size() - 5];
+			if (c != '0' && c != '1') {
+				return {};
+			}
+			a_isOne = c == '1';
+			std::string other = a_path;
+			other[other.size() - 5] = a_isOne ? '0' : '1';
+			return other;
+		}
+
+		// 肌の shape の頂点を、体重 a_w（0〜1）で _0 と _1 の間に混ぜた位置にする（ゲームが体・服を作るときと同じ）。
+		// a_pair は対の nif の皮付き shape（a_shapes と同じ順）。混ぜられなければ理由を返し、何もしない
+		std::string BlendWeight(RE::NiSkinPartition*& a_mine, RE::BSGeometry* a_geo, RE::BSGeometry* a_pairGeo, bool a_isOne, float a_w, float& a_maxMove)
+		{
+			auto pskin = a_pairGeo ? a_pairGeo->GetGeometryRuntimeData().skinInstance.get() : nullptr;
+			auto psp = pskin ? pskin->skinPartition.get() : nullptr;
+			if (!psp || !psp->numPartitions || !psp->partitions[0].buffData || !psp->partitions[0].buffData->rawVertexData) {
+				return "対の shape に頂点が無い";
+			}
+			if (std::string_view(a_geo->name.c_str()) != std::string_view(a_pairGeo->name.c_str())) {
+				return std::format("対の shape の名前が違う（{}）", a_pairGeo->name.c_str());
+			}
+			const auto nv = a_mine->vertexCount;
+			if (psp->vertexCount != nv) {
+				return std::format("対の shape と頂点の数が違う（{} と {}）", nv, psp->vertexCount);
+			}
+			auto       b = a_mine->partitions[0].buffData;
+			auto       pb = psp->partitions[0].buffData;
+			const auto stride = b->vertexDesc.GetSize();
+			const auto pstride = pb->vertexDesc.GetSize();
+			// 対の側の shape 自身の移動の差も足す（ふつうは同じ）
+			const auto fo = FrameOffset(a_geo);
+			const auto pfo = FrameOffset(a_pairGeo);
+			// 自分の位置 p、対の位置 q。_1 の重み a_w なので、自分が _1 なら p + (q − p)(1 − a_w)、自分が _0 なら p + (q − p) a_w
+			const float t = a_isOne ? 1.0f - a_w : a_w;
+			std::vector<std::array<float, 3>> pos(nv);
+			std::vector<char>                 hit(nv, 0);
+			int                               n = 0;
+			a_maxMove = 0.0f;
+			for (std::uint32_t v = 0; v < nv; ++v) {
+				const float* p = reinterpret_cast<const float*>(b->rawVertexData + static_cast<std::size_t>(v) * stride);
+				const float* q = reinterpret_cast<const float*>(pb->rawVertexData + static_cast<std::size_t>(v) * pstride);
+				float        d[3];
+				float        l2 = 0.0f;
+				for (int k = 0; k < 3; ++k) {
+					d[k] = (q[k] + pfo[k] - fo[k] - p[k]) * t;
+					l2 += d[k] * d[k];
+				}
+				if (l2 < 1e-8f) {
+					continue;
+				}
+				pos[v] = { p[0] + d[0], p[1] + d[1], p[2] + d[2] };
+				hit[v] = 1;
+				++n;
+				a_maxMove = (std::max)(a_maxMove, std::sqrt(l2));
+			}
+			if (!n) {
+				return {};  // _0 と _1 が同じ形
+			}
+			std::string why;
+			auto        blended = MakeMovedPartition(a_mine, pos, hit, why);
+			if (!blended) {
+				return why;
+			}
+			a_mine = blended;  // 元の切った物は手放さない（決して解放しない作り）
+			return {};
+		}
+
+		Fileless* GetFileless(const char* a_path, int a_zLo, int a_zHi, int a_weight, std::string& a_why)
+		{
+			const auto key = std::format("{}|{}|{}|w{}", Lower(a_path), a_zLo, a_zHi, a_weight);
 			if (auto it = g_fileless.find(key); it != g_fileless.end()) {
 				return &it->second;
 			}
@@ -832,6 +962,24 @@ namespace Band
 			CollectSkinned(normal.get(), shapes);
 			if (shapes.empty()) {
 				return fail("元の体 nif に皮付きの shape が無い");
+			}
+			// 体重: ゲームは _0（体重 0）と _1（体重 100）を NPC の体重で混ぜて体・服・靴を作る。帯も同じに混ぜないと、
+			// 体重の軽い NPC では帯の脚だけ太く、体重に合わせたブーツから突き抜ける（カルロッタ）
+			RE::NiPointer<RE::NiNode>    pairRoot;
+			std::vector<RE::BSGeometry*> pairShapes;
+			bool                         isOne = true;
+			const float                  w = std::clamp(a_weight, 0, 100) / 100.0f;
+			if (const auto pairPath = WeightPair(a_path, isOne); !pairPath.empty() && (isOne ? w < 0.999f : w > 0.001f)) {
+				RE::BSModelDB::DBTraits::ArgsType pargs;
+				const auto                        pec = RE::BSModelDB::Demand(pairPath.c_str(), pairRoot, pargs);
+				if (pec == RE::BSResource::ErrorCode::kNone && pairRoot) {
+					CollectSkinned(pairRoot.get(), pairShapes);
+				}
+				if (pairShapes.size() != shapes.size()) {
+					logger::info("  帯（ファイル無し）: 体重 {} の対の nif {} を使えない（読めない、または皮付きの shape の数が違う {} と {}）。体重を混ぜずに作る", a_weight,
+						pairPath, pairShapes.size(), shapes.size());
+					pairShapes.clear();
+				}
 			}
 			Fileless f;
 			f.root = normal;
@@ -1000,6 +1148,15 @@ namespace Band
 				}
 				logger::info("  帯（ファイル無し）: [{}] {}区画 {} 個、三角 {} 個のうち {} 個を消した（うち範囲の中の腕・手首 {} 個）", geo->name.c_str(),
 					isSkin ? "" : std::format("肌でない shape（z {:.1f}〜{:.1f}）を範囲で切った。", lo, hi), orig->numPartitions, total, removed, armCut);
+				if (isSkin && !pairShapes.empty()) {
+					const std::size_t idx = static_cast<std::size_t>(std::find(shapes.begin(), shapes.end(), geo) - shapes.begin());
+					float             maxMove = 0.0f;
+					if (const auto bwhy = BlendWeight(mine, geo, pairShapes[idx], isOne, w, maxMove); bwhy.empty()) {
+						logger::info("  帯（ファイル無し）: [{}] 体重 {} に合わせて _0 と _1 を混ぜた（最大 {:.2f} 動かした）", geo->name.c_str(), a_weight, maxMove);
+					} else {
+						logger::info("  帯（ファイル無し）: [{}] 体重 {} に合わせられない（{}）。_{} の形のまま", geo->name.c_str(), a_weight, bwhy, isOne ? 1 : 0);
+					}
+				}
 				if (!isSkin) {
 					// 切った下着（飾りなど）も、体から外に出ている所は体に寄せる
 					std::string twhy;
@@ -1328,9 +1485,11 @@ namespace Band
 		}
 
 		// ファイル無しで複製を作る。a_take に付ける shape（範囲の中に何も残らない物は除く）。失敗したら nullptr と理由
-		RE::NiNode* FilelessClone(const std::string& a_path, int a_zLo, int a_zHi, std::vector<RE::BSGeometry*>& a_take, bool& a_hasSkin, std::string& a_why)
+		// a_weight は体重（0〜100）。体の nif は _0 と _1 をこの体重で混ぜる（下着は 100 のまま。体の外側に来るので突き抜けない）
+		RE::NiNode* FilelessClone(const std::string& a_path, int a_zLo, int a_zHi, int a_weight, std::vector<RE::BSGeometry*>& a_take, bool& a_hasSkin,
+			std::string& a_why)
 		{
-			auto f = GetFileless(a_path.c_str(), a_zLo, a_zHi, a_why);
+			auto f = GetFileless(a_path.c_str(), a_zLo, a_zHi, a_weight, a_why);
 			if (!f) {
 				return nullptr;
 			}
@@ -1363,11 +1522,14 @@ namespace Band
 		const int  zLo = 0;
 		const int  zHi = g_zHi;
 		const auto uw = StripMeshes(a_underwear);
-		// 前に付けた帯: 同じ根に付いたままで、範囲も下着も同じなら何もしない。根が変わった（3D が作り直された）なら、古い帯は古い 3D と一緒に消えているので記録だけ捨てる
+		// 体重（0〜100）。帯の体の形を混ぜる。共有する写しを増やしすぎないよう 10 刻みにする（脚の太さの差は 1 刻みで 0.1 程度）
+		const auto base = a_actor->GetActorBase();
+		const int  weight = base ? std::clamp(static_cast<int>(std::lround(base->weight / 10.0f)) * 10, 0, 100) : 100;
+		// 前に付けた帯: 同じ根に付いたままで、範囲も下着も体重も同じなら何もしない。根が変わった（3D が作り直された）なら、古い帯は古い 3D と一緒に消えているので記録だけ捨てる
 		if (auto it = g_state.find(id); it != g_state.end()) {
 			const bool sameRoot = rootNode && static_cast<const void*>(rootNode) == it->second.root;
 			const int  alive = sameRoot ? CountAttached(it->second, rootNode) : 0;
-			if (sameRoot && alive == static_cast<int>(it->second.shapes.size()) && it->second.zHi == zHi && it->second.src == uw) {
+			if (sameRoot && alive == static_cast<int>(it->second.shapes.size()) && it->second.zHi == zHi && it->second.src == uw && it->second.weight == weight) {
 				logger::info("  帯: 前に付けた帯が付いたまま");
 				return true;
 			}
@@ -1417,7 +1579,7 @@ namespace Band
 			std::string                  why;
 			bool                         hasSkin = false;
 			std::vector<RE::BSGeometry*> uwTake;
-			if (FilelessClone(uw, zLo, zHi, uwTake, hasSkin, why)) {
+			if (FilelessClone(uw, zLo, zHi, 100, uwTake, hasSkin, why)) {
 				uwUsed = true;
 				needBody = !hasSkin;
 				take.insert(take.end(), uwTake.begin(), uwTake.end());
@@ -1432,8 +1594,8 @@ namespace Band
 			std::string why;
 			bool        hasSkin = false;
 			std::vector<RE::BSGeometry*> bodyTake;
-			if (FilelessClone(bodyPath, zLo, zHi, bodyTake, hasSkin, why)) {
-				logger::info("  帯: 体はファイル無しで作れた");
+			if (FilelessClone(bodyPath, zLo, zHi, weight, bodyTake, hasSkin, why)) {
+				logger::info("  帯: 体はファイル無しで作れた（体重 {}）", weight);
 			} else {
 				logger::info("  帯: 体はファイルの方式に戻した（{}）", why);
 				bodyTake.clear();
@@ -1494,6 +1656,7 @@ namespace Band
 		st.zHi = zHi;
 		st.arma = arma;
 		st.src = uw;
+		st.weight = weight;
 		for (auto geo : take) {
 			RE::NiPointer<RE::NiAVObject> k(geo);
 			if (auto parent = geo->parent) {
