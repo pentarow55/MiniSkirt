@@ -49,6 +49,7 @@ namespace Probe
 			bool  weldCeiling{ true };     // スカートの中の「下向きの水平な面」（覗くと黒い天井になる）を面積 0 にする
 			bool  twoSided{ true };        // スカートの shape を両面描画にする（裏側の布が見えるように）
 			bool  cutCloth{ true };        // 裾より下の布を縮めず切る（縮めると布が腰に溜まり、覗くと黒い塊になる）
+			int   hemStyle{ 1 };           // 裾の切り方: 0 = ラフ / 1 = 水平（既定）
 		};
 		Cfg g_cfg;
 
@@ -144,6 +145,8 @@ namespace Probe
 					g_cfg.weldCeiling = B(val);
 				} else if (key == "cut_cloth") {
 					g_cfg.cutCloth = B(val);
+				} else if (key == "hem_style") {
+					g_cfg.hemStyle = std::atoi(val.c_str());
 				}
 			});
 			const bool mcm = ReadIni(kMcmSettings, [](const std::string& key, const std::string& val) {
@@ -166,8 +169,11 @@ namespace Probe
 					g_cfg.skirtGapNoBone = F(val);
 				} else if (key == "bUnderwear") {
 					g_cfg.underwear = B(val);
+				} else if (key == "iHemStyle") {
+					g_cfg.hemStyle = std::atoi(val.c_str());
 				}
 			});
+			g_cfg.hemStyle = (std::clamp)(g_cfg.hemStyle, 0, 1);
 			g_cfg.lengthPct = (std::clamp)(g_cfg.lengthPct, kLengthMinPct, kLengthMaxPct);
 			g_cfg.hem = HemFromLength(g_cfg.lengthPct);
 			logger::info("設定: 有効={} スカート丈 {}%（すその高さ hem={:.1f}{}）、お尻のゆとり hip_ease={}、広がり角度 flare_angle={}°、下着を着ける={}、年配の女性を外す={}（MCM の設定ファイル {}）", g_cfg.enabled,
@@ -540,7 +546,7 @@ namespace Probe
 					hemNew = res.hemZ;
 				} else if (g_cfg.cutCloth) {
 					// 縮めず、裾より下の布を切る（重みは動かさないので写し替えも要らない）。CPU 側の頂点は CutCloth が直接書く
-					hemNew = Band::CutCloth(a_geo, buf, g_cfg.hem, sleeve, ent.dead);
+					hemNew = Band::CutCloth(a_geo, buf, g_cfg.hem, sleeve, ent.dead, g_cfg.hemStyle);
 					pos.clear();
 				} else {
 					const auto pos0 = pos;
@@ -1179,7 +1185,7 @@ namespace Probe
 			}
 #endif
 			const bool topChanged = std::lround(old.bandTop) != std::lround(g_cfg.bandTop);
-			const bool changed = topChanged || old.enabled != g_cfg.enabled || old.hem != g_cfg.hem || old.excludeElderly != g_cfg.excludeElderly || old.hipEase != g_cfg.hipEase || old.flareAngle != g_cfg.flareAngle ||
+			const bool changed = topChanged || old.enabled != g_cfg.enabled || old.hem != g_cfg.hem || old.hemStyle != g_cfg.hemStyle || old.excludeElderly != g_cfg.excludeElderly || old.hipEase != g_cfg.hipEase || old.flareAngle != g_cfg.flareAngle ||
 			                     old.skirtGap != g_cfg.skirtGap || old.skirtGapNoBone != g_cfg.skirtGapNoBone || old.waist != g_cfg.waist ||
 			                     old.remapWeights != g_cfg.remapWeights || old.underwear != g_cfg.underwear;
 			if (!changed) {

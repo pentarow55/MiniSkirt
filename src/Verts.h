@@ -12,6 +12,8 @@
 #include <d3d11.h>
 #include <d3d11_4.h>
 
+#include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -271,6 +273,22 @@ namespace Verts
 		return h;
 	}
 
+	// 裾の線へ滑らせた頂点（頂点の中身の鍵 → 頂点番号と書いた位置）。3D が作り直されて記録が消えても、書いた位置のままの頂点だけを元に戻すため
+	inline std::map<std::uint64_t, std::vector<std::pair<std::uint32_t, std::array<float, 3>>>> g_hemMoved;
+
+	inline void NoteHemMoved(RE::BSGraphics::TriShape* a_b, std::uint32_t a_n, const std::vector<std::pair<std::uint32_t, std::array<float, 3>>>& a_moves)
+	{
+		if (a_moves.empty()) {
+			return;
+		}
+		auto& list = g_hemMoved[VertKey(a_b, a_n)];
+		for (const auto& m : a_moves) {
+			if (std::find(list.begin(), list.end(), m) == list.end()) {
+				list.push_back(m);
+			}
+		}
+	}
+
 	inline std::uint64_t TopoKey(RE::NiSkinPartition* a_part, RE::BSGraphics::TriShape* a_b, std::uint32_t a_n)
 	{
 		auto       desc = a_b->vertexDesc;
@@ -381,6 +399,18 @@ namespace Verts
 			if (!nan && !collapsed && skinned && off + 12 <= stride && std::memcmp(cur + off, org + off, 12) != 0) {
 				std::memcpy(cur + off, org + off, 12);
 				++restored;
+			}
+		}
+		if (auto mv = g_hemMoved.find(VertKey(a_b, n)); mv != g_hemMoved.end()) {
+			for (const auto& [v, q] : mv->second) {
+				if (v >= n) {
+					continue;
+				}
+				auto* cur = a_b->rawVertexData + static_cast<std::size_t>(v) * stride;
+				if (std::memcmp(cur, q.data(), 12) == 0) {  // 体型モーフで位置が違う頂点は、滑らせた物ではないので触らない
+					std::memcpy(cur, orgv.data() + static_cast<std::size_t>(v) * stride, 12);
+					++restored;
+				}
 			}
 		}
 		if (restored) {

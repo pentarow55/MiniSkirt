@@ -1510,6 +1510,31 @@ namespace Band
 			st.shapes.push_back(k);
 			++attached;
 		}
+		// NPC がもう画面の照明に登録された後で帯を付けると、帯だけライトの一覧が空のままで真っ黒に見える（付ける順番しだいで起きる）。
+		// メインスレッドで、一覧が空の帯をゲームの照明に登録する。NPC がまだ場面に入っていなければ、入るときにゲームが帯ごと登録する
+		if (auto tasks = SKSE::GetTaskInterface()) {
+			tasks->AddTask([root = RE::NiPointer<RE::NiAVObject>(rootNode), shapes = st.shapes] {
+				auto ssn = RE::BSShaderManager::State::GetSingleton().shadowSceneNode[0];
+				if (!ssn) {
+					return;
+				}
+				bool inScene = false;
+				for (RE::NiAVObject* o = root.get(); o; o = o->parent) {
+					inScene |= o == ssn;
+				}
+				if (!inScene) {
+					return;
+				}
+				for (auto& s : shapes) {
+					auto geo = s ? s->AsGeometry() : nullptr;
+					auto prop = geo ? netimmerse_cast<RE::BSLightingShaderProperty*>(geo->GetGeometryRuntimeData().shaderProperty.get()) : nullptr;
+					if (prop && geo->parent == root.get() && prop->lightingLightData.lights.empty()) {
+						ssn->AttachObject(geo);
+						logger::info("  帯: [{}] 照明に登録した（ライト {} 個）", geo->name.c_str(), prop->lightingLightData.lights.size());
+					}
+				}
+			});
+		}
 		g_state[id] = std::move(st);
 		logger::info("  帯: shape を {} 個付けた（下着 {}）", attached, uwUsed ? uw : std::string("なし"));
 		return true;
@@ -1693,6 +1718,26 @@ namespace Band
 			return p && *p ? p : "（なし）";
 		}
 
+		// 出したばかりの NPC（PlaceAtMe など）は、服の肌にまだ NPC の肌の色が付いておらず灰色（0.867 など）のまま。
+		// それを写すと帯だけ色が違う（膝から下は後で色が付く）。灰色なら NPC の体の色（QNAM）に替える
+		void FixUntinted(RE::BSGeometry* a_geo, RE::BSLightingShaderMaterialFacegenTint* a_mat, RE::TESNPC* a_base)
+		{
+			if (!a_mat || !a_base) {
+				return;
+			}
+			auto&       t = a_mat->tintColor;
+			const bool  grey = std::abs(t.red - t.green) < 0.01f && std::abs(t.green - t.blue) < 0.01f;
+			const auto& c = a_base->bodyTintColor;
+			const RE::NiColor body(c.red / 255.0f, c.green / 255.0f, c.blue / 255.0f);
+			if (!grey || (c.red == 0 && c.green == 0 && c.blue == 0) ||
+				(std::abs(body.red - t.red) < 0.02f && std::abs(body.green - t.green) < 0.02f && std::abs(body.blue - t.blue) < 0.02f)) {
+				return;
+			}
+			logger::info("  帯の肌: [{}] 写した色 ({:.3f}, {:.3f}, {:.3f}) はまだ肌の色が付いていない灰色なので、NPC の体の色 ({:.3f}, {:.3f}, {:.3f}) にした",
+				a_geo ? a_geo->name.c_str() : "?", t.red, t.green, t.blue, body.red, body.green, body.blue);
+			t = body;
+		}
+
 		std::string TintText(RE::BSShaderMaterial* a_mat)
 		{
 			if (!a_mat || a_mat->GetFeature() != RE::BSShaderMaterial::Feature::kFaceGenRGBTint) {
@@ -1768,6 +1813,16 @@ namespace Band
 				mainTex = lower(TexPath(p->material));
 			}
 		}
+		// 帯の形には人物用の照明（kCharacterLighting）が付いていない。服の肌・手・足には付いており、帯（太ももから足首）だけ暗く赤く見えた。
+		// ふつうは服を身に着ける時にゲームが付ける。帯は自前で付けるので、ここで付ける
+		for (auto& s : it->second.shapes) {
+			auto geo = s ? s->AsGeometry() : nullptr;
+			auto prop = geo ? netimmerse_cast<RE::BSLightingShaderProperty*>(geo->GetGeometryRuntimeData().shaderProperty.get()) : nullptr;
+			if (prop && !prop->flags.all(RE::BSShaderProperty::EShaderPropertyFlag::kCharacterLighting)) {
+				prop->SetFlags(RE::BSShaderProperty::EShaderPropertyFlag8::kCharacterLighting, true);
+				logger::info("  帯: [{}] 人物用の照明（kCharacterLighting）を付けた", geo->name.c_str());
+			}
+		}
 		for (auto& s : it->second.shapes) {
 			auto geo = s ? s->AsGeometry() : nullptr;
 			auto prop = geo ? netimmerse_cast<RE::BSLightingShaderProperty*>(geo->GetGeometryRuntimeData().shaderProperty.get()) : nullptr;
@@ -1800,6 +1855,7 @@ namespace Band
 					const auto& c = base->bodyTintColor;
 					mat->tintColor = RE::NiColor(c.red / 255.0f, c.green / 255.0f, c.blue / 255.0f);
 				}
+				FixUntinted(geo, mat, base);
 				logger::info("  帯の肌: [{}] 体の本体（{}）と別のテクスチャなので、テクスチャは変えず色だけ{}から写した（色 {}、テクスチャ {}）", geo->name.c_str(), mainTex,
 					srcMat ? "服の肌" : "NPC の体の色", TintText(mat), TexPath(mat));
 				continue;
@@ -1808,6 +1864,9 @@ namespace Band
 				// 服の肌の材質の写し（この NPC 専用の新しい材質。a_unique=true）を帯に付ける
 				auto srcMat = src->GetGeometryRuntimeData().shaderProperty->material;
 				prop->SetMaterial(srcMat, true);
+				if (prop->material != srcMat) {
+					FixUntinted(geo, static_cast<RE::BSLightingShaderMaterialFacegenTint*>(prop->material), base);
+				}
 				logger::info("  帯の肌: [{}] 服の肌の shape [{}] から写した（色 {}、テクスチャ {}）。材質は{}", geo->name.c_str(), src->name.c_str(),
 					TintText(prop->material), TexPath(prop->material), prop->material == srcMat ? "服と同じ物（写しにならなかった）" : "この NPC 専用");
 				continue;
@@ -2173,7 +2232,7 @@ namespace Band
 		return static_cast<int>(targets.size());
 	}
 
-	float CutCloth(RE::BSGeometry* a_geo, RE::BSGraphics::TriShape* a_buf, float a_hem, const std::vector<float>& a_sleeve, std::vector<char>& a_dead)
+	float CutCloth(RE::BSGeometry* a_geo, RE::BSGraphics::TriShape* a_buf, float a_hem, const std::vector<float>& a_sleeve, std::vector<char>& a_dead, int a_style)
 	{
 		auto skin = a_geo->GetGeometryRuntimeData().skinInstance.get();
 		auto part = skin ? skin->skinPartition.get() : nullptr;
@@ -2185,7 +2244,8 @@ namespace Band
 		const auto stride = a_buf->vertexDesc.GetSize();
 		auto*      raw = a_buf->rawVertexData;
 		auto       pos = [&](std::uint32_t v) { return reinterpret_cast<float*>(raw + static_cast<std::size_t>(v) * stride); };
-		const float       oz = FrameOffset(a_geo)[2];
+		const auto        fo = FrameOffset(a_geo);
+		const float       oz = fo[2];
 		std::vector<char> cand(n, 0), kept(n, 0);
 		for (std::uint32_t v = 0; v < n; ++v) {
 			cand[v] = pos(v)[2] + oz < a_hem && a_sleeve[v] < 0.5f;
@@ -2231,13 +2291,77 @@ namespace Band
 			a_dead[v] = 1;
 			++collapsed;
 		}
+		// 水平（方式 1）: 残した縁の頂点を、線より上の隣へ向かう辺に沿って線まで滑らせる（面のバッファは触らない）。
+		// UV 違いで分かれた同じ位置の頂点は同じ所へ動かす（裂け目を作らない）。UV と重みは元のまま
+		int nSlid = 0;
+		if (a_style == 1 && !noNan) {
+			auto keyOf = [&](std::uint32_t v) {
+				const float* f = pos(v);
+				return std::array<int, 3>{ static_cast<int>(std::lround(f[0] * 100.0f)), static_cast<int>(std::lround(f[1] * 100.0f)), static_cast<int>(std::lround(f[2] * 100.0f)) };
+			};
+			struct Sum
+			{
+				float x{ 0.0f }, y{ 0.0f }, z{ 0.0f };
+				int   count{ 0 };
+			};
+			std::map<std::array<int, 3>, Sum> sums;
+			for (std::uint32_t i = 0; i < part->numPartitions; ++i) {
+				auto& p = part->partitions[i];
+				if (!p.buffData || !p.buffData->rawIndexData) {
+					continue;
+				}
+				const auto* ix = p.buffData->rawIndexData;
+				for (std::uint32_t t = 0; t < p.triangles; ++t) {
+					const std::uint16_t tri[3]{ ix[t * 3], ix[t * 3 + 1], ix[t * 3 + 2] };
+					if (tri[0] >= n || tri[1] >= n || tri[2] >= n || (cand[tri[0]] && cand[tri[1]] && cand[tri[2]])) {
+						continue;
+					}
+					for (const auto v : tri) {
+						if (!cand[v] || a_dead[v]) {
+							continue;
+						}
+						const float target = a_hem, zv = pos(v)[2] + oz;
+						if (!(zv < target)) {
+							continue;
+						}
+						for (const auto u : tri) {
+							const float zu = pos(u)[2] + oz;
+							if (cand[u] || !(zu > target)) {
+								continue;
+							}
+							const float k = (target - zv) / (zu - zv);
+							auto&       s = sums[keyOf(v)];
+							s.x += pos(v)[0] + (pos(u)[0] - pos(v)[0]) * k;
+							s.y += pos(v)[1] + (pos(u)[1] - pos(v)[1]) * k;
+							s.z += target - oz;
+							++s.count;
+						}
+					}
+				}
+			}
+			std::vector<std::pair<std::uint32_t, std::array<float, 3>>> moves;
+			for (std::uint32_t v = 0; v < n; ++v) {
+				if (!cand[v] || a_dead[v] || !(pos(v)[2] + oz < a_hem)) {
+					continue;
+				}
+				if (auto it = sums.find(keyOf(v)); it != sums.end() && it->second.count) {
+					const float c = static_cast<float>(it->second.count);
+					moves.push_back({ v, { it->second.x / c, it->second.y / c, it->second.z / c } });
+				}
+			}
+			for (const auto& [v, q] : moves) {
+				std::memcpy(pos(v), q.data(), 12);
+			}
+			nSlid = static_cast<int>(moves.size());
+			Verts::NoteHemMoved(a_buf, n, moves);
+		}
 		float hemNew = 1e9f;
 		for (std::uint32_t v = 0; v < n; ++v) {
 			if (!a_dead[v] && a_sleeve[v] < 0.5f) {
 				hemNew = (std::min)(hemNew, pos(v)[2] + oz);
 			}
 		}
-		logger::info("    布を切る: [{}] z<{:.1f} の頂点のうち、NaN にして消した {} 個、縁として残した {} 個。裾 z={:.1f}", a_geo->name.c_str(), a_hem, collapsed, nEdge, hemNew);
+		logger::info("    布を切る: [{}] 方式 {}、z<{:.1f} の頂点のうち、NaN にして消した {} 個、縁として残した {} 個（線へ滑らせた {} 個）。裾 z={:.1f}", a_geo->name.c_str(), a_style, a_hem, collapsed, nEdge, nSlid, hemNew);
 		return hemNew;
 	}
 

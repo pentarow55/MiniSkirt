@@ -41,7 +41,8 @@ namespace Band
 	// スカートの布を「縮める」のではなく「切る」: z < a_hem の頂点だけでできた三角形を消す（面は触らず、その頂点を同じ区画の縁の頂点の位置・重みに重ねて面積ほぼ 0 にする）。
 	// 縮めると下の布が全部腰に溜まり、覗くと黒い布の塊になるため。a_sleeve が 0.5 以上の頂点は切らない。
 	// a_dead に重ねた頂点の印を返す。戻り値: 切ったあとの裾の高さ（残った頂点でいちばん低い z。袖は除く）。切る物が無ければ元の裾
-	float CutCloth(RE::BSGeometry* a_geo, RE::BSGraphics::TriShape* a_buf, float a_hem, const std::vector<float>& a_sleeve, std::vector<char>& a_dead);
+	// a_style: 0 = rough (keep whole triangles), 1 = level (default)
+	float CutCloth(RE::BSGeometry* a_geo, RE::BSGraphics::TriShape* a_buf, float a_hem, const std::vector<float>& a_sleeve, std::vector<char>& a_dead, int a_style = 1);
 	// 付けた帯がまだ付いているか（切り分け用）
 	struct Status
 	{

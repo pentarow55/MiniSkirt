@@ -47,6 +47,19 @@
       }
     },
     {
+      "id": "iHemStyle:General",
+      "text": "$MSK_CutStyleText",
+      "help": "$MSK_CutStyleHelp",
+      "type": "stepper",
+      "valueOptions": {
+        "options": [
+          "$MSK_CutOptRoughText",
+          "$MSK_CutOptLevelText"
+        ],
+        "sourceType": "ModSettingInt"
+      }
+    },
+    {
       "id": "fHipEase:General",
       "text": "$MSK_HipEaseText",
       "help": "$MSK_HipEaseHelp",
