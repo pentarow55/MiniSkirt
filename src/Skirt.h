@@ -30,6 +30,7 @@ namespace Skirt
 		float       hemZ{ 0.0f };
 		float       flare{ 0.0f };
 		bool        wrapsLegs{ false };  // 「脚が分かれている」とき: 左右の脚をそれぞれ筒のように包んでいるか（ズボン。viewer/skirt.py の wraps_legs）
+		bool        spansCenter{ false };  // 腰より下の頂点が体の左右（x < -4 かつ x > 4）をまたいでいるか（片側のポーチ・バッグ等を除外する）
 		std::string reason;
 	};
 
@@ -44,13 +45,19 @@ namespace Skirt
 			return r;
 		}
 		float       minZ = a_pos[0].z, maxZ = a_pos[0].z;
+		float       lowMinX = 1e9f, lowMaxX = -1e9f;
 		std::size_t nLow = 0;
 		for (auto& p : a_pos) {
 			minZ = std::min(minZ, p.z);
 			maxZ = std::max(maxZ, p.z);
-			nLow += p.z < a_waist;
+			if (p.z < a_waist) {
+				++nLow;
+				lowMinX = std::min(lowMinX, p.x);
+				lowMaxX = std::max(lowMaxX, p.x);
+			}
 		}
 		r.hemZ = minZ;
+		r.spansCenter = (nLow >= 10 && lowMinX < -4.0f && lowMaxX > 4.0f);
 		if (a_pos.size() < 50 || nLow < a_pos.size() / 10) {
 			r.reason = "腰より下の頂点が少ない";
 			return r;

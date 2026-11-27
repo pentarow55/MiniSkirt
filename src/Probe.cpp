@@ -433,12 +433,24 @@ namespace Probe
 				// 鎧のスカート状の部品は、まっすぐ垂れて広がらないことがあるので、広がりは問わない（裾の輪がつながっている＝ズボンでない、は同じに見る）
 				const auto tAnalyze = std::chrono::steady_clock::now();
 				auto       res = Skirt::Analyze(body, g_cfg.waist, g_armorMode ? 0.0f : 1.05f);
+				auto       pr0 = a_geo->GetGeometryRuntimeData().shaderProperty.get();
+				const bool isSkin = pr0 && pr0->material && pr0->material->GetFeature() == RE::BSShaderMaterial::Feature::kFaceGenRGBTint;
+				// ストレート／タイトスカート（裾が広がらなくても、輪がつながっていて体の左右をまたぐ非肌 shape。ズボンは下の LegTubes で弾く）
+				if (!g_armorMode && !isSkin && !res.isSkirt && res.reason == "裾が広がらない" && res.flare >= 0.90f && res.spansCenter) {
+					res.isSkirt = true;
+					res.reason = "スカート（ストレート）";
+				}
+				// 2 段目（すでにスカートあり・ズボン無しと確定した衣装）: 同じ衣装に同居する別レイヤーのスカート（広がり不足のアンダースカートや、
+				// ズボンではないスリット入りの後ろスカート等）が切られずに残ると二重スカートになるため、一緒に切る
+				if (!g_dry && !isSkin && !res.isSkirt && res.spansCenter &&
+					(res.reason == "裾が広がらない" || (res.reason.rfind("脚が分かれている", 0) == 0 && !res.wrapsLegs))) {
+					logger::info("    → [{}] は同じ衣装の別レイヤーのスカート（{}、広がり {:.2f}）→ 二重スカートを防ぐため一緒に切る", name, res.reason, res.flare);
+					res.isSkirt = true;
+				}
 				if (g_dry) {
 					g_usAnalyze += UsSince(tAnalyze);
 					logger::info("    判定: {}（裾 z={:.1f}、広がり {:.2f}）", res.reason, res.hemZ, res.flare);
 				}
-				auto       pr0 = a_geo->GetGeometryRuntimeData().shaderProperty.get();
-				const bool isSkin = pr0 && pr0->material && pr0->material->GetFeature() == RE::BSShaderMaterial::Feature::kFaceGenRGBTint;
 				// スカート状の部品があるだけでなく、下半身にズボン状の物（肌でない shape で脚が分かれている）が無いことも条件にする（服も鎧も。
 				// 物乞いのローブのように、スカートの下にズボンをはいている服は、短くしても脚は布のままで、中に素肌が無い）
 				// 脚を筒のように包んでいる物だけをズボンとみなす（左右に垂れた薄いマントの布は脚が分かれて見えるが、ズボンではない）
@@ -481,23 +493,21 @@ namespace Probe
 						logger::info("    {}: [{}] の中に片脚ずつ囲む筒がある（ズボン）→ この{}は対象外", g_armorMode ? "鎧" : "服", name, g_armorMode ? "鎧" : "服");
 					}
 				}
-				// 鎧の裾の飾り（毛皮の縁取りなど）: 腰まで届かず、まるごと切り線（裾の目標）より下にある、肌でない輪の部品。
-				// スカートだけ切ると、切った裾の下に取り残されて宙に浮くので、スカートと同じ切り方で全部消す。
-				// 脚が分かれた部品（脚甲）なら、ズボン状なので、鎧ごと対象外にする（膝より上まである物だけ。ブーツは数えない）
+				// 裾の飾り（毛皮の縁取り・スカート裾のレースやトリムなど）: 腰まで届かず、まるごと切り線（裾の目標）より下にある、肌でない輪の部品。
+				// スカートだけ切ると、切った裾の下に取り残されて宙に浮くので、スカートと同じ切り方で全部消す（スカートがある衣装のときだけ切られる）。
+				// 脚が分かれた部品（ストッキング・脚甲など）は輪でないため消さない。鎧で膝より上まである脚甲なら鎧ごと対象外にする
 				bool trim = false;
-				if (g_armorMode && g_cfg.apply && !res.isSkirt && res.reason.rfind("腰まで届かない", 0) == 0 && !body.empty()) {
-					auto pr = a_geo->GetGeometryRuntimeData().shaderProperty.get();
-					const bool isSkinShape = pr && pr->material && pr->material->GetFeature() == RE::BSShaderMaterial::Feature::kFaceGenRGBTint;
-					if (!isSkinShape) {
+				if (g_cfg.apply && !res.isSkirt && res.reason.rfind("腰まで届かない", 0) == 0 && !body.empty()) {
+					if (!isSkin) {
 						float maxZ = -1e9f;
 						for (auto& p : body) {
 							maxZ = (std::max)(maxZ, p.z);
 						}
 						const auto r2 = Skirt::Analyze(body, maxZ + 6.0f, 0.0f);  // 自分の上端を腰とみなして、輪か（つながっているか）、脚が分かれているかを見る
-						if (r2.isSkirt && maxZ < g_cfg.hem) {
+						if ((r2.isSkirt || (r2.reason == "裾が広がらない" && r2.spansCenter)) && maxZ < g_cfg.hem) {
 							trim = true;
-							if (g_dry) logger::info("    鎧: [{}] は裾の飾り（輪、上端 z={:.1f} が切り線 {:.0f} より下）→ スカートと同じに切って消す", name, maxZ, g_cfg.hem);
-						} else if (g_dry && maxZ >= 45.0f && r2.reason.rfind("脚が分かれている", 0) == 0) {
+							if (g_dry) logger::info("    裾の飾り: [{}]（輪、上端 z={:.1f} が切り線 {:.0f} より下）→ スカートと同じに切って消す", name, maxZ, g_cfg.hem);
+						} else if (g_armorMode && g_dry && maxZ >= 45.0f && r2.reason.rfind("脚が分かれている", 0) == 0) {
 							g_pants = true;
 							logger::info("    鎧: [{}] は肌でなく脚が分かれている（脚甲など、上端 z={:.1f}）→ この鎧は対象外", name, maxZ);
 						}
