@@ -1,6 +1,7 @@
 #include "PCH.h"
 
 #include "Band.h"
+#include "BodyMorph.h"
 #include "DevFlags.h"
 #include "Layout.h"
 #include "Skirt.h"
@@ -33,6 +34,7 @@ namespace Band
 			bool                                       skinDone{ false };  // 肌の色・テクスチャを NPC に合わせた
 			std::string                                src;  // 下着の nif（空なら裸の体だけ）。変わったら付け直す
 			int                                        weight{ 100 };  // 帯の体を混ぜた体重（10 刻み）
+			std::uint64_t                              morphHash{ 0 };  // 帯に反映した RaceMenu / OBody モーフの署名
 		};
 		std::unordered_map<RE::FormID, State> g_state;
 
@@ -194,6 +196,7 @@ namespace Band
 		auto root = a_actor->Get3D();
 		auto rootNode = root ? root->AsNode() : nullptr;
 		st.rootSame = rootNode && static_cast<const void*>(rootNode) == it->second.root;
+		st.morphChanged = BodyMorph::Available() && BodyMorph::Hash(a_actor) != it->second.morphHash;
 		st.total = static_cast<int>(it->second.shapes.size());
 		st.attached = st.rootSame ? CountAttached(it->second, rootNode) : 0;
 		return st;
@@ -491,15 +494,19 @@ namespace Band
 		// ゲームの終了時まで持ち続ける（少しのメモリと引き換えに安全にする）
 		struct Fileless
 		{
-			RE::NiPointer<RE::NiNode>                   root;   // 元の体（Demand の根。複製の元）
+			std::string                                     key;    // キャッシュ鍵（モーフ適用版のキャッシュ鍵にも使う）
+			RE::NiPointer<RE::NiNode>                       root;   // 元の体（Demand の根。複製の元）
 			std::vector<RE::NiPointer<RE::NiSkinPartition>> origs;  // 元の skinPartition（shape の順）
 			std::vector<RE::NiPointer<RE::NiSkinPartition>> mine;   // 自前の skinPartition（同じ順）
-			std::vector<const void*>                    skins;  // 元の NiSkinInstance（複製がこれを共有していたら差し替えない）
-			std::vector<char>                           empty;  // 範囲の中に何も残らない shape（付けない）
-			bool                                        hasSkin{ false };  // 肌（体）の shape がある
+			std::vector<const void*>                        skins;  // 元の NiSkinInstance（複製がこれを共有していたら差し替えない）
+			std::vector<char>                               empty;  // 範囲の中に何も残らない shape（付けない）
+			std::vector<std::string>                        shapeNames;  // shape 名（.tri 照合用）
+			std::vector<std::string>                        shapeTris;   // shape ごとの BODYTRI パス（無ければ空）
+			bool                                            hasSkin{ false };  // 肌（体）の shape がある
 		};
-		std::map<std::string, Fileless> g_fileless;      // 体 nif のパス（小文字）＋範囲 → ファイル無しの帯
-		std::map<std::string, std::string> g_filelessNg;  // 作れなかった物 → 理由（同じ起動中に何度も試さない）
+		std::map<std::string, Fileless>                                        g_fileless;         // 体 nif のパス（小文字）＋範囲 → ファイル無しの帯
+		std::map<std::string, std::string>                                     g_filelessNg;       // 作れなかった物 → 理由（同じ起動中に何度も試さない）
+		std::map<std::string, std::vector<RE::NiPointer<RE::NiSkinPartition>>> g_morphedFileless;  // 体 nif 鍵＋モーフ署名 → モーフ適用済み skinPartition（shape 順）
 
 		ID3D11Device* Device()
 		{
@@ -982,7 +989,12 @@ namespace Band
 				}
 			}
 			Fileless f;
+			f.key = key;
 			f.root = normal;
+			for (auto geo : shapes) {
+				f.shapeNames.emplace_back(geo->name.c_str() ? geo->name.c_str() : "");
+				f.shapeTris.emplace_back(BodyMorph::FindBodyTri(normal.get(), geo));
+			}
 			int kept = 0;
 			// 肌の体の点（腕・手は除く）。下着を体に寄せる基準。z の順に並べる（近い点を探すとき z で打ち切る）
 			std::vector<SkinPt> skinPts;
@@ -1213,6 +1225,76 @@ namespace Band
 				}
 			}
 			return true;
+		}
+
+		// OBody / RaceMenu の体型モーフを、複製済み帯（および対応する下着）の skinPartition へ反映する。
+		// 同じ (体鍵, モーフ署名) はキャッシュして複数 NPC で共有する。
+		void ApplyFilelessMorphs(Fileless& a_f, const std::vector<RE::BSGeometry*>& a_shapes, const BodyMorph::Snapshot& a_morphs)
+		{
+			if (a_morphs.empty() || a_shapes.size() != a_f.shapeTris.size()) {
+				return;
+			}
+			bool anyTri = false;
+			for (std::size_t i = 0; i < a_shapes.size(); ++i) {
+				if (!a_f.empty[i] && !a_f.shapeTris[i].empty()) {
+					anyTri = true;
+					break;
+				}
+			}
+			if (!anyTri) {
+				return;
+			}
+
+			const auto mkey = std::format("{}|m{:016X}", a_f.key, a_morphs.hash);
+			auto       it = g_morphedFileless.find(mkey);
+			if (it == g_morphedFileless.end()) {
+				std::vector<RE::NiPointer<RE::NiSkinPartition>> parts(a_shapes.size());
+				for (std::size_t i = 0; i < a_shapes.size(); ++i) {
+					if (a_f.empty[i] || a_f.shapeTris[i].empty()) {
+						continue;
+					}
+					auto skin = a_shapes[i]->GetGeometryRuntimeData().skinInstance.get();
+					auto cur = skin ? skin->skinPartition.get() : nullptr;
+					if (!cur || !cur->numPartitions || !cur->partitions[0].buffData || !cur->partitions[0].buffData->rawVertexData) {
+						continue;
+					}
+					auto       b0 = cur->partitions[0].buffData;
+					const auto nv = cur->vertexCount;
+					const auto stride = b0->vertexDesc.GetSize();
+					std::vector<std::array<float, 3>> pos(nv);
+					std::vector<char>                 hit(nv, 0);
+					for (std::uint32_t v = 0; v < nv; ++v) {
+						const float* fp = reinterpret_cast<const float*>(b0->rawVertexData + static_cast<std::size_t>(v) * stride);
+						pos[v] = { fp[0], fp[1], fp[2] };
+					}
+					int   moved = 0;
+					float maxMove = 0.0f;
+					if (!BodyMorph::ApplyToPositions(a_f.shapeTris[i], a_f.shapeNames[i], a_morphs, pos, hit, moved, maxMove)) {
+						continue;
+					}
+					std::string why;
+					auto        morphed = MakeMovedPartition(cur, pos, hit, why);
+					if (morphed) {
+						if (!a_f.mine[i]) {
+							cur->IncRefCount();  // 元の skinPartition と配列を共有するので手放さない
+						}
+						parts[i] = RE::NiPointer<RE::NiSkinPartition>(morphed);
+						logger::info("  帯（モーフ）: [{}] モーフ {} 種を反映（頂点 {} 個、最大 {:.2f} 動かした）", a_f.shapeNames[i], a_morphs.morphs.size(), moved, maxMove);
+					} else {
+						logger::info("  帯（モーフ）: [{}] モーフを反映できない（{}）", a_f.shapeNames[i], why);
+					}
+				}
+				it = g_morphedFileless.emplace(mkey, std::move(parts)).first;
+			}
+
+			for (std::size_t i = 0; i < a_shapes.size(); ++i) {
+				if (it->second[i]) {
+					auto skin = a_shapes[i]->GetGeometryRuntimeData().skinInstance.get();
+					if (skin && static_cast<const void*>(skin) != a_f.skins[i]) {
+						skin->skinPartition = it->second[i];
+					}
+				}
+			}
 		}
 	}
 	namespace
@@ -1486,8 +1568,8 @@ namespace Band
 
 		// ファイル無しで複製を作る。a_take に付ける shape（範囲の中に何も残らない物は除く）。失敗したら nullptr と理由
 		// a_weight は体重（0〜100）。体の nif は _0 と _1 をこの体重で混ぜる（下着は 100 のまま。体の外側に来るので突き抜けない）
-		RE::NiNode* FilelessClone(const std::string& a_path, int a_zLo, int a_zHi, int a_weight, std::vector<RE::BSGeometry*>& a_take, bool& a_hasSkin,
-			std::string& a_why)
+		RE::NiNode* FilelessClone(const std::string& a_path, int a_zLo, int a_zHi, int a_weight, const BodyMorph::Snapshot* a_morphs,
+			std::vector<RE::BSGeometry*>& a_take, bool& a_hasSkin, std::string& a_why)
 		{
 			auto f = GetFileless(a_path.c_str(), a_zLo, a_zHi, a_weight, a_why);
 			if (!f) {
@@ -1504,6 +1586,9 @@ namespace Band
 			}
 			std::vector<RE::BSGeometry*> shapes;
 			CollectSkinned(c, shapes);
+			if (a_morphs && !a_morphs->empty()) {
+				ApplyFilelessMorphs(*f, shapes, *a_morphs);
+			}
 			for (std::size_t i = 0; i < shapes.size(); ++i) {
 				if (!f->empty[i]) {
 					a_take.push_back(shapes[i]);
@@ -1525,16 +1610,18 @@ namespace Band
 		// 体重（0〜100）。帯の体の形を混ぜる。共有する写しを増やしすぎないよう 10 刻みにする（脚の太さの差は 1 刻みで 0.1 程度）
 		const auto base = a_actor->GetActorBase();
 		const int  weight = base ? std::clamp(static_cast<int>(std::lround(base->weight / 10.0f)) * 10, 0, 100) : 100;
-		// 前に付けた帯: 同じ根に付いたままで、範囲も下着も体重も同じなら何もしない。根が変わった（3D が作り直された）なら、古い帯は古い 3D と一緒に消えているので記録だけ捨てる
+		const auto morphs = BodyMorph::Query(a_actor);
+		// 前に付けた帯: 同じ根に付いたままで、範囲・下着・体重・モーフも同じなら何もしない。根が変わった（3D が作り直された）なら、古い帯は古い 3D と一緒に消えているので記録だけ捨てる
 		if (auto it = g_state.find(id); it != g_state.end()) {
 			const bool sameRoot = rootNode && static_cast<const void*>(rootNode) == it->second.root;
 			const int  alive = sameRoot ? CountAttached(it->second, rootNode) : 0;
-			if (sameRoot && alive == static_cast<int>(it->second.shapes.size()) && it->second.zHi == zHi && it->second.src == uw && it->second.weight == weight) {
+			if (sameRoot && alive == static_cast<int>(it->second.shapes.size()) && it->second.zHi == zHi && it->second.src == uw && it->second.weight == weight &&
+			    it->second.morphHash == morphs.hash) {
 				logger::info("  帯: 前に付けた帯が付いたまま");
 				return true;
 			}
-			logger::info("  帯: 前に付けた帯を付け直す（根が同じ={}、付いている {}/{}、上端 {}→{}、下着 [{}]→[{}]）", sameRoot ? "はい" : "いいえ", alive,
-				it->second.shapes.size(), it->second.zHi, zHi, it->second.src, uw);
+			logger::info("  帯: 前に付けた帯を付け直す（根が同じ={}、付いている {}/{}、上端 {}→{}、下着 [{}]→[{}]、モーフ一致={}）", sameRoot ? "はい" : "いいえ", alive,
+				it->second.shapes.size(), it->second.zHi, zHi, it->second.src, uw, it->second.morphHash == morphs.hash ? "はい" : "いいえ");
 			if (sameRoot) {
 				for (auto& s : it->second.shapes) {
 					if (s && s->parent == rootNode) {
@@ -1579,7 +1666,7 @@ namespace Band
 			std::string                  why;
 			bool                         hasSkin = false;
 			std::vector<RE::BSGeometry*> uwTake;
-			if (FilelessClone(uw, zLo, zHi, 100, uwTake, hasSkin, why)) {
+			if (FilelessClone(uw, zLo, zHi, 100, &morphs, uwTake, hasSkin, why)) {
 				uwUsed = true;
 				needBody = !hasSkin;
 				take.insert(take.end(), uwTake.begin(), uwTake.end());
@@ -1594,7 +1681,7 @@ namespace Band
 			std::string why;
 			bool        hasSkin = false;
 			std::vector<RE::BSGeometry*> bodyTake;
-			if (FilelessClone(bodyPath, zLo, zHi, weight, bodyTake, hasSkin, why)) {
+			if (FilelessClone(bodyPath, zLo, zHi, weight, &morphs, bodyTake, hasSkin, why)) {
 				logger::info("  帯: 体はファイル無しで作れた（体重 {}）", weight);
 			} else {
 				logger::info("  帯: 体はファイルの方式に戻した（{}）", why);
@@ -1657,6 +1744,7 @@ namespace Band
 		st.arma = arma;
 		st.src = uw;
 		st.weight = weight;
+		st.morphHash = morphs.hash;
 		for (auto geo : take) {
 			RE::NiPointer<RE::NiAVObject> k(geo);
 			if (auto parent = geo->parent) {

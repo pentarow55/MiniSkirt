@@ -46,10 +46,11 @@ namespace Band
 	// 付けた帯がまだ付いているか（切り分け用）
 	struct Status
 	{
-		bool known{ false };     // この NPC に帯を付けた記録がある
-		bool rootSame{ false };  // 3D の根が付けたときと同じ
-		int  attached{ 0 };      // いまも根に付いている帯の shape の数
-		int  total{ 0 };         // 付けた帯の shape の数
+		bool known{ false };        // この NPC に帯を付けた記録がある
+		bool rootSame{ false };     // 3D の根が付けたときと同じ
+		bool morphChanged{ false }; // RaceMenu / OBody の体型モーフが付けたときと変わった
+		int  attached{ 0 };         // いまも根に付いている帯の shape の数
+		int  total{ 0 };            // 付けた帯の shape の数
 	};
 	Status Check(RE::Actor* a_actor);
 	// 縮める服を着ていなくなった・設定で無効にした・帯の上端を変えたときに、付けた帯を外す（a_why はログ用の理由）

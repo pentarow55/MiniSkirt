@@ -755,10 +755,12 @@ namespace Probe
 				}
 				return false;
 			}
-			// 前の設定で書き換えた NPC: 元に戻してから今の設定で作り直す（帯は Attach が上端を見て付け直す）
-			if (auto g = g_genOf.find(a_id); g != g_genOf.end() && g->second != g_gen) {
+			// 前の設定で書き換えた NPC、または OBody / RaceMenu の体型モーフが変わった NPC: 元に戻してから作り直す
+			const bool morphChanged = Band::Check(actor).morphChanged;
+			if (morphChanged || (g_genOf.find(a_id) != g_genOf.end() && g_genOf[a_id] != g_gen)) {
 				const int r = RestoreActor(actor);
-				logger::info("設定が変わったので {} ({:08X}) を元に戻した（頂点の写し {} 個）", actor->GetDisplayFullName(), a_id, r);
+				logger::info("{} ので {} ({:08X}) を元に戻した（頂点の写し {} 個）", morphChanged ? "体型モーフが変わった" : "設定が変わった",
+					actor->GetDisplayFullName(), a_id, r);
 				if (!g_cfg.enabled) {
 					Band::Detach(actor, "設定で無効にした");
 				}
@@ -1081,11 +1083,12 @@ namespace Probe
 					continue;
 				}
 				const auto st = Band::Check(actor);
-				if (CountShortened(actor) > 0 && !(st.known && (!st.rootSame || st.attached < st.total))) {
+				if (CountShortened(actor) > 0 && !(st.known && (!st.rootSame || st.attached < st.total || st.morphChanged))) {
 					continue;
 				}
-				logger::info("定期確認: {} ({:08X}) の 3D が作り直された／帯が外れたので、もう一度処理する（帯の記録={} 根が同じ={} 帯 {}/{}）", actor->GetDisplayFullName(), id,
-					st.known ? "あり" : "なし", st.rootSame ? "はい" : "いいえ", st.attached, st.total);
+				logger::info("定期確認: {} ({:08X}) の {} ので、もう一度処理する（帯の記録={} 根が同じ={} 帯 {}/{} モーフ変化={}）", actor->GetDisplayFullName(), id,
+					st.morphChanged ? "体型モーフが変わった" : "3D が作り直された／帯が外れた", st.known ? "あり" : "なし", st.rootSame ? "はい" : "いいえ", st.attached,
+					st.total, st.morphChanged ? "はい" : "いいえ");
 				Enqueue(0, id);  // 処理は待ち行列で 1 人ずつ（数フレームに分けて）。縮める服でなくなったら、処理のあとで g_skirtActors から外す
 			}
 			Later(2000, [] { Tick(); });

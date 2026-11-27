@@ -43,6 +43,8 @@ add_commonlibsse_plugin(
 		src/Skirt.h
 		src/Probe.cpp
 		src/Band.h
+		src/BodyMorph.h
+		src/BodyMorph.cpp
 		src/DevFlags.h
 		src/Band.cpp
 		src/Layout.h

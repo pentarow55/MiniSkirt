@@ -283,10 +283,16 @@ namespace Verts
 		}
 		const bool skinned = desc.HasFlag(RE::BSGraphics::Vertex::VF_SKINNED);
 		const auto off = skinned ? desc.GetAttributeOffset(RE::BSGraphics::Vertex::VA_SKINNING) : 0u;
+		const bool hasNorm = desc.HasFlag(RE::BSGraphics::Vertex::VF_NORMAL);
+		const auto offNorm = hasNorm ? desc.GetAttributeOffset(RE::BSGraphics::Vertex::VA_NORMAL) : 0u;
+		const bool hasTan = desc.HasFlag(RE::BSGraphics::Vertex::VF_TANGENT);
+		const auto offTan = hasTan ? desc.GetAttributeOffset(RE::BSGraphics::Vertex::VA_BINORMAL) : 0u;
+		const auto posEnd = 16u;
 		for (std::uint32_t v = 0; v < a_n; ++v) {
 			const auto* vp = a_b->rawVertexData + static_cast<std::size_t>(v) * stride;
-			for (std::uint32_t k = 12; k < stride; ++k) {
-				if (skinned && k >= off && k < off + 12) {
+			for (std::uint32_t k = posEnd; k < stride; ++k) {
+				if ((skinned && k >= off && k < off + 12) || (hasNorm && k >= offNorm && k < offNorm + 4) ||
+				    (hasTan && k >= offTan && k < offTan + 4)) {
 					continue;
 				}
 				h = (h ^ vp[k]) * 0x100000001b3ull;
@@ -321,10 +327,16 @@ namespace Verts
 		}
 		const bool skinned = desc.HasFlag(RE::BSGraphics::Vertex::VF_SKINNED);
 		const auto off = skinned ? desc.GetAttributeOffset(RE::BSGraphics::Vertex::VA_SKINNING) : 0u;
+		const bool hasNorm = desc.HasFlag(RE::BSGraphics::Vertex::VF_NORMAL);
+		const auto offNorm = hasNorm ? desc.GetAttributeOffset(RE::BSGraphics::Vertex::VA_NORMAL) : 0u;
+		const bool hasTan = desc.HasFlag(RE::BSGraphics::Vertex::VF_TANGENT);
+		const auto offTan = hasTan ? desc.GetAttributeOffset(RE::BSGraphics::Vertex::VA_BINORMAL) : 0u;
+		const auto posEnd = 16u;
 		for (std::uint32_t v = 0; v < a_n; ++v) {
 			const auto* vp = a_b->rawVertexData + static_cast<std::size_t>(v) * stride;
-			for (std::uint32_t k = 12; k < stride; ++k) {
-				if (skinned && k >= off && k < off + 12) {
+			for (std::uint32_t k = posEnd; k < stride; ++k) {
+				if ((skinned && k >= off && k < off + 12) || (hasNorm && k >= offNorm && k < offNorm + 4) ||
+				    (hasTan && k >= offTan && k < offTan + 4)) {
 					continue;
 				}
 				h = (h ^ vp[k]) * 0x100000001b3ull;

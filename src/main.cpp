@@ -1,5 +1,6 @@
 #include "PCH.h"
 
+#include "BodyMorph.h"
 #include "Layout.h"
 
 namespace Probe
@@ -35,8 +36,12 @@ namespace
 
 	void OnMessage(SKSE::MessagingInterface::Message* a_msg)
 	{
+		if (a_msg->type == SKSE::MessagingInterface::kPostPostLoad) {
+			BodyMorph::Init();
+		}
 		if (a_msg->type == SKSE::MessagingInterface::kDataLoaded) {
 			logger::info("データの読み込み完了 (kDataLoaded)");
+			BodyMorph::Init();  // 念のため（kPostPostLoad 未発火環境向け）
 			Probe::Install();
 #ifdef MINISKIRT_DEVTOOLS
 			DebugCmd::Install();
