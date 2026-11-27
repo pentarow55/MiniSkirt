@@ -254,11 +254,33 @@ namespace Verts
 	// 面のハッシュまで含む鍵（TopoKey）で見つからなかったときの最後の手段
 	inline std::map<std::uint64_t, std::vector<std::uint8_t>> g_pristineByVerts;
 
-	inline std::uint64_t VertKey(RE::BSGraphics::TriShape* a_b, std::uint32_t a_n)
+	inline std::uint64_t BoneOrderHash(RE::NiSkinInstance* a_skin)
+	{
+		std::uint64_t h = 0x517cc1b727220a95ull;
+		if (!a_skin || !a_skin->skinData || !a_skin->bones) {
+			return h;
+		}
+		const auto nb = a_skin->skinData->GetBoneCount();
+		h = (h ^ nb) * 0x100000001b3ull;
+		for (std::uint32_t i = 0; i < nb; ++i) {
+			auto b = a_skin->bones[i];
+			const char* nm = (b && b->name.c_str()) ? b->name.c_str() : "";
+			for (const unsigned char* p = reinterpret_cast<const unsigned char*>(nm); *p; ++p) {
+				h = (h ^ *p) * 0x100000001b3ull;
+			}
+			h = (h ^ 0xFFu) * 0x100000001b3ull;
+		}
+		return h;
+	}
+
+	inline std::uint64_t VertKey(RE::BSGraphics::TriShape* a_b, std::uint32_t a_n, RE::NiSkinInstance* a_skin = nullptr)
 	{
 		auto       desc = a_b->vertexDesc;
 		const auto stride = desc.GetSize();
 		std::uint64_t h = 0x84222325cbf29ce4ull ^ (static_cast<std::uint64_t>(a_n) << 20) ^ stride;
+		if (a_skin) {
+			h = (h ^ BoneOrderHash(a_skin)) * 0x100000001b3ull;
+		}
 		const bool skinned = desc.HasFlag(RE::BSGraphics::Vertex::VF_SKINNED);
 		const auto off = skinned ? desc.GetAttributeOffset(RE::BSGraphics::Vertex::VA_SKINNING) : 0u;
 		for (std::uint32_t v = 0; v < a_n; ++v) {
@@ -289,11 +311,14 @@ namespace Verts
 		}
 	}
 
-	inline std::uint64_t TopoKey(RE::NiSkinPartition* a_part, RE::BSGraphics::TriShape* a_b, std::uint32_t a_n)
+	inline std::uint64_t TopoKey(RE::NiSkinPartition* a_part, RE::BSGraphics::TriShape* a_b, std::uint32_t a_n, RE::NiSkinInstance* a_skin = nullptr)
 	{
 		auto       desc = a_b->vertexDesc;
 		const auto stride = desc.GetSize();
 		std::uint64_t h = 0xcbf29ce484222325ull ^ (static_cast<std::uint64_t>(a_n) << 20) ^ stride;
+		if (a_skin) {
+			h = (h ^ BoneOrderHash(a_skin)) * 0x100000001b3ull;
+		}
 		const bool skinned = desc.HasFlag(RE::BSGraphics::Vertex::VF_SKINNED);
 		const auto off = skinned ? desc.GetAttributeOffset(RE::BSGraphics::Vertex::VA_SKINNING) : 0u;
 		for (std::uint32_t v = 0; v < a_n; ++v) {
@@ -339,8 +364,9 @@ namespace Verts
 			return 0;
 		}
 		const auto bytes = Bytes(a_b, n);
-		const auto key = std::make_pair(a_actor, TopoKey(part, a_b, n));
-		// 元の探し方: この NPC の元 → 別 NPC の元（面あり）→ 頂点だけの鍵。
+		const auto key = std::make_pair(a_actor, TopoKey(part, a_b, n, skin));
+		const auto vkey = VertKey(a_b, n, skin);
+		// 元の探し方: この NPC の元 → 別 NPC の元（面あり）→ 頂点だけの鍵（骨の並び順も含むので別衣装の素体とは衝突しない）。
 		// 同じ服の NPC は頂点バッファを共有することがあり、後から処理される NPC は「初めて見る」ときにはもう別の NPC が切ったあと
 		// （＝この NPC の元は記録できない）。なので、元は NPC を問わない控えにも必ず持ち、この NPC の元が無ければそれで戻す
 		const std::vector<std::uint8_t>* src = nullptr;
@@ -352,7 +378,7 @@ namespace Verts
 		} else if (auto gt = g_pristine.find(std::make_pair(0u, key.second)); gt != g_pristine.end()) {
 			src = &gt->second;
 			how = "別 NPC の元（面あり）";
-		} else if (auto jt = g_pristineByVerts.find(VertKey(a_b, n)); jt != g_pristineByVerts.end()) {
+		} else if (auto jt = g_pristineByVerts.find(vkey); jt != g_pristineByVerts.end()) {
 			src = &jt->second;
 			how = "別 NPC の元（頂点のみ）";
 		}
@@ -361,7 +387,7 @@ namespace Verts
 				g_pristine[key].assign(a_b->rawVertexData, a_b->rawVertexData + bytes);
 				logger::info("    元を覚えた: NPC {:08X}、頂点 {}、面ありの鍵 {:016X}", a_actor, n, key.second);
 				g_pristine.try_emplace(std::make_pair(0u, key.second)).first->second.assign(a_b->rawVertexData, a_b->rawVertexData + bytes);
-				g_pristineByVerts.try_emplace(VertKey(a_b, n)).first->second.assign(a_b->rawVertexData, a_b->rawVertexData + bytes);
+				g_pristineByVerts.try_emplace(vkey).first->second.assign(a_b->rawVertexData, a_b->rawVertexData + bytes);
 			} else {
 				logger::info("    元が無い: 切られた頂点（NaN）を渡されたが、覚えた元が見つからない（頂点 {}、NPC {:08X}、面ありの鍵 {:016X}）", n, a_actor, key.second);
 			}

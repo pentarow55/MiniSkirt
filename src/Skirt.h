@@ -172,7 +172,14 @@ namespace Skirt
 				break;
 			}
 		}
-		const bool bottomBridged = bottom >= 0 ? bridged[bottom] : (seen[kSlices - 1] ? bridged[kSlices - 1] : bridged[kSlices - 2]);
+		int nBridged = 0;
+		for (int i = 0; i < kSlices; ++i) {
+			nBridged += bridged[i] ? 1 : 0;
+		}
+		// 裾の 1 本だけ頂点が疎で bridged にならないロングスカート（VOR の酒場・料理人の服など）をズボンと誤判定しないよう、
+		// 8 本中 5 本以上がつながっていればスカートとして通す（ズボンは股より下が分かれるため 1〜2 本以下。中に筒があれば後段の LegTubes で弾く）
+		const bool bottomBridged = (bottom >= 0 ? bridged[bottom] : (seen[kSlices - 1] ? bridged[kSlices - 1] : bridged[kSlices - 2])) ||
+		                           (nBridged >= 5);
 		if (!bottomBridged) {
 			r.reason = "脚が分かれている（ズボン／素の脚）";
 			// 左右の脚をそれぞれ筒のように包んでいるか: 左右の両方に頂点がある輪のうちいちばん下で、左右どちらも幅・奥行きが 5 以上。
