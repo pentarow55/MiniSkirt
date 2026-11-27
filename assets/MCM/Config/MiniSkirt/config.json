@@ -137,6 +137,31 @@
         "formatString": "{1}",
         "sourceType": "ModSettingFloat"
       }
+    },
+    {
+      "type": "empty"
+    },
+    {
+      "text": "$MSK_PerTargetText",
+      "type": "header"
+    },
+    {
+      "id": "iTargetHotkey:General",
+      "text": "$MSK_TargetHotkeyText",
+      "help": "$MSK_TargetHotkeyHelp",
+      "type": "keymap",
+      "valueOptions": {
+        "sourceType": "ModSettingInt"
+      }
+    },
+    {
+      "id": "bLearnAdjustPower:General",
+      "text": "$MSK_LearnAdjustPowerText",
+      "help": "$MSK_LearnAdjustPowerHelp",
+      "type": "toggle",
+      "valueOptions": {
+        "sourceType": "ModSettingBool"
+      }
     }
   ]
 }

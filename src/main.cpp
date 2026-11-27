@@ -7,6 +7,7 @@ namespace Probe
 {
 	void Early();
 	void Install();
+	void OnGameLoaded();
 }
 
 #ifdef MINISKIRT_DEVTOOLS
@@ -46,6 +47,9 @@ namespace
 #ifdef MINISKIRT_DEVTOOLS
 			DebugCmd::Install();
 #endif
+		}
+		if (a_msg->type == SKSE::MessagingInterface::kPostLoadGame || a_msg->type == SKSE::MessagingInterface::kNewGame) {
+			Probe::OnGameLoaded();
 		}
 	}
 }

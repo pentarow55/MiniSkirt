@@ -6,7 +6,9 @@
 #include "Band.h"
 #include "DevFlags.h"
 #include "Layout.h"
+#include "Overrides.h"
 #include "Skirt.h"
+#include "TargetMenu.h"
 #include "Underwear.h"
 #include "Verts.h"
 
@@ -50,8 +52,12 @@ namespace Probe
 			bool  twoSided{ true };        // スカートの shape を両面描画にする（裏側の布が見えるように）
 			bool  cutCloth{ true };        // 裾より下の布を縮めず切る（縮めると布が腰に溜まり、覗くと黒い塊になる）
 			int   hemStyle{ 1 };           // 裾の切り方: 0 = ラフ / 1 = 水平（既定）
+			int   targetHotkey{ 66 };      // 目の前の NPC の個別設定メニューを開くキー（DXScanCode。既定 66 = F8、0 で無効）
+			bool  learnAdjustPower{ false };  // VR・パッド向けの調整パワーを習得する
 		};
 		Cfg g_cfg;
+		float g_curLengthPct{ 24.0f };  // 現在処理中の NPC に適用するスカート丈（%）
+		float g_curHem{ 65.0f };        // 現在処理中の NPC に適用するすその高さ
 
 		std::string Trim(std::string a_s)
 		{
@@ -100,7 +106,7 @@ namespace Probe
 		{
 			return kWaistbandZ - (kWaistbandZ - kFullHemZ) * (std::clamp)(a_pct, kLengthMinPct, kLengthMaxPct) / 100.0f;
 		}
-		bool FullLength() { return g_cfg.lengthPct >= kLengthMaxPct; }
+		bool FullLength() { return g_curLengthPct >= kLengthMaxPct; }
 		bool  B(const std::string& a_v) { return std::atoi(a_v.c_str()) != 0 || a_v == "true" || a_v == "True"; }
 
 		// MCM Helper がユーザーの変えた値を書くファイル（MCM が無い環境では無い）
@@ -171,11 +177,17 @@ namespace Probe
 					g_cfg.underwear = B(val);
 				} else if (key == "iHemStyle") {
 					g_cfg.hemStyle = std::atoi(val.c_str());
+				} else if (key == "iTargetHotkey") {
+					g_cfg.targetHotkey = std::atoi(val.c_str());
+				} else if (key == "bLearnAdjustPower") {
+					g_cfg.learnAdjustPower = B(val);
 				}
 			});
 			g_cfg.hemStyle = (std::clamp)(g_cfg.hemStyle, 0, 1);
 			g_cfg.lengthPct = (std::clamp)(g_cfg.lengthPct, kLengthMinPct, kLengthMaxPct);
 			g_cfg.hem = HemFromLength(g_cfg.lengthPct);
+			g_curLengthPct = g_cfg.lengthPct;
+			g_curHem = g_cfg.hem;
 			logger::info("設定: 有効={} スカート丈 {}%（すその高さ hem={:.1f}{}）、お尻のゆとり hip_ease={}、広がり角度 flare_angle={}°、下着を着ける={}、年配の女性を外す={}（MCM の設定ファイル {}）", g_cfg.enabled,
 				g_cfg.lengthPct, g_cfg.hem, FullLength() ? "、元の長さのまま脚だけ体の脚にする" : "", g_cfg.hipEase, g_cfg.flareAngle,
 				g_cfg.underwear, g_cfg.excludeElderly, mcm ? "あり" : "なし");
@@ -504,9 +516,9 @@ namespace Probe
 							maxZ = (std::max)(maxZ, p.z);
 						}
 						const auto r2 = Skirt::Analyze(body, maxZ + 6.0f, 0.0f);  // 自分の上端を腰とみなして、輪か（つながっているか）、脚が分かれているかを見る
-						if ((r2.isSkirt || (r2.reason == "裾が広がらない" && r2.spansCenter)) && maxZ < g_cfg.hem) {
+						if ((r2.isSkirt || (r2.reason == "裾が広がらない" && r2.spansCenter)) && maxZ < g_curHem) {
 							trim = true;
-							if (g_dry) logger::info("    裾の飾り: [{}]（輪、上端 z={:.1f} が切り線 {:.0f} より下）→ スカートと同じに切って消す", name, maxZ, g_cfg.hem);
+							if (g_dry) logger::info("    裾の飾り: [{}]（輪、上端 z={:.1f} が切り線 {:.0f} より下）→ スカートと同じに切って消す", name, maxZ, g_curHem);
 						} else if (g_armorMode && g_dry && maxZ >= 45.0f && r2.reason.rfind("脚が分かれている", 0) == 0) {
 							g_pants = true;
 							logger::info("    鎧: [{}] は肌でなく脚が分かれている（脚甲など、上端 z={:.1f}）→ この鎧は対象外", name, maxZ);
@@ -536,7 +548,7 @@ namespace Probe
 				// 切ると内側の布が無くなり、外側の布の裏が描かれない（カリング）ので、スカートの shape を両面描画にする
 				// 切る所が無いスカート（丈 100%、または元の裾が丈の目標より上）: 元の長さ・形のまま（切らず、両面描画・天井消し・A ラインもしない。
 				// どれも切ったスカートの見え方を直すための物）。服の中の脚を消して帯の脚を出し、突き抜ける所だけ押し出す
-				const bool full = !trim && (FullLength() || res.hemZ >= g_cfg.hem - 0.5f);
+				const bool full = !trim && (FullLength() || res.hemZ >= g_curHem - 0.5f);
 				if (!trim && !full) {
 					g_anyCut = true;
 				}
@@ -556,11 +568,11 @@ namespace Probe
 					hemNew = res.hemZ;
 				} else if (g_cfg.cutCloth) {
 					// 縮めず、裾より下の布を切る（重みは動かさないので写し替えも要らない）。CPU 側の頂点は CutCloth が直接書く
-					hemNew = Band::CutCloth(a_geo, buf, g_cfg.hem, sleeve, ent.dead, g_cfg.hemStyle);
+					hemNew = Band::CutCloth(a_geo, buf, g_curHem, sleeve, ent.dead, g_cfg.hemStyle);
 					pos.clear();
 				} else {
 					const auto pos0 = pos;
-					hemNew = Skirt::Shorten(pos, g_cfg.waist, g_cfg.hem, &sleeve);
+					hemNew = Skirt::Shorten(pos, g_cfg.waist, g_curHem, &sleeve);
 					if (g_cfg.remapWeights && fo[0] == 0.0f && fo[1] == 0.0f && fo[2] == 0.0f) {  // 座標系がずれた服では位置で頂点を引けない
 						RemapWeights(buf, part, pos0, pos, sleeve);  // 重みは縦に縮めた位置で選ぶ（広げる前）
 					}
@@ -580,7 +592,7 @@ namespace Probe
 				ent.shortened = true;
 				ent.cut = !full;
 				ent.trim = trim;
-				ent.hemNew = trim ? g_cfg.hem : hemNew;
+				ent.hemNew = trim ? g_curHem : hemNew;
 				Verts::Seal(buf, n);
 				g_shortened = true;
 				// GPU 側へ反映（新しい頂点バッファを作って差し替える）
@@ -741,6 +753,8 @@ namespace Probe
 			RE::TESObjectARMO*            armor{ nullptr };
 			std::string                   who;
 			std::uint64_t                 token{ 0 };
+			float                         lengthPct{ 30.0f };
+			float                         hem{ 56.4f };
 			long long                     us[4]{};
 		};
 		std::uint64_t g_jobToken = 0;  // 処理を始めるたびに増やす。途中の段は、自分の番号と違えば（別の処理が割り込んだ）やめる
@@ -775,15 +789,8 @@ namespace Probe
 			if (!base || base->GetSex() != RE::SEX::kFemale) {
 				return false;
 			}
-			// 年配の女性を外す設定: 何もしない（前に縮めていれば上で元に戻してある）。設定を戻したとき作り直せるよう、見た NPC には入れておく
-			if (g_cfg.excludeElderly && IsElderly(actor)) {
-				g_seen.insert(a_id);
-				SkipLog(actor, a_id, 5, "年配の女性（設定で外している）");
-				Band::Detach(actor, "年配の女性を外す設定");
-				return false;
-			}
-			// 体スロット（32）に着ている物が「衣服」のときだけ調べる（鎧・手袋・ブーツ・頭は見ない）
-			// 服を脱いだ・鎧に着替えたなど、縮める服を着ていなければ、前に付けた帯を外す
+			// 体スロット（32）に着ている物が「衣服」または「鎧」のときだけ調べる
+			// 服を脱いだなど、縮める服を着ていなければ、前に付けた帯を外す
 			auto armor = actor->GetWornArmor(RE::BGSBipedObjectForm::BipedObjectSlot::kBody);
 			const bool isClothing = armor && armor->GetArmorType() == RE::BGSBipedObjectForm::ArmorType::kClothing;
 			const bool isArmor = armor && !isClothing;  // 鎧も対象。スカート状の部品があって、ズボン状の部品が無いときだけ縮める
@@ -793,6 +800,22 @@ namespace Probe
 					armor ? std::format("体スロットの物 {} ({:08X}) が衣服でない（種類 {}）", armor->GetName(), armor->GetFormID(), static_cast<int>(armor->GetArmorType())) :
 					        std::string("体スロットに何も着ていない"));
 				Band::Detach(actor);
+				return false;
+			}
+			// 個別設定（優先順位: NPC 個別 > 衣装別 > 全体設定）を解決
+			const auto resolved = Overrides::Resolve(actor, armor, g_cfg.enabled, g_cfg.excludeElderly && IsElderly(actor), g_cfg.lengthPct);
+			if (!resolved.enabled) {
+				g_seen.insert(a_id);
+				RestoreActor(actor);
+				const char* why = resolved.enabledSource == Overrides::Source::kNpc    ? "NPC 個別設定で除外" :
+				                  resolved.enabledSource == Overrides::Source::kOutfit ? "衣装別設定で除外" :
+				                                                                         "年配の女性（設定で外している）";
+				SkipLog(actor, a_id, 5, why);
+				Band::Detach(actor, why);
+				if (auto& biped = actor->GetCurrentBiped(); biped && biped->objects[RE::BIPED_OBJECT::kBody].partClone) {
+					const std::string whoSkip = std::format("{} ({:08X})", actor->GetDisplayFullName(), a_id);
+					Band::EnsureUniqueOutfit(biped->objects[RE::BIPED_OBJECT::kBody].partClone.get(), whoSkip, a_id);
+				}
 				return false;
 			}
 			auto& biped = actor->GetCurrentBiped();
@@ -806,8 +829,16 @@ namespace Probe
 				return false;
 			}
 			const std::string who = std::format("{} ({:08X})", actor->GetDisplayFullName(), a_id);
-			logger::info("女性 NPC: {} 衣服: {} ({:08X})", who, armor->GetName(), armor->GetFormID());
+			logger::info("女性 NPC: {} 衣服: {} ({:08X}) 丈: {:.0f}%", who, armor->GetName(), armor->GetFormID(), resolved.lengthPct);
 			g_seen.insert(a_id);
+			// NPC 個別設定がある場合は、同じ服を着ている他 NPC へ波及しないよう頂点バッファを分離する
+			if (resolved.hasNpcRule) {
+				Band::EnsureUniqueOutfit(obj.partClone.get(), who, a_id);
+			}
+			a_job.lengthPct = resolved.lengthPct;
+			a_job.hem = HemFromLength(resolved.lengthPct);
+			g_curLengthPct = a_job.lengthPct;
+			g_curHem = a_job.hem;
 			// 3D が作り直されて、書き換え済みの頂点が写されていないか調べ、あれば元に戻す（脚が消えたままになるのを防ぐ）
 			RefreshOutfit(obj.partClone.get(), who, a_id);
 			// 1 回目: 判定だけ（スカートがあるか）
@@ -890,6 +921,8 @@ namespace Probe
 			auto       actor = RE::TESForm::LookupByID<RE::Actor>(a_job.id);
 			auto       root = a_job.root.get();
 			const auto t0 = std::chrono::steady_clock::now();
+			g_curLengthPct = a_job.lengthPct;
+			g_curHem = a_job.hem;
 			if (a_k == 1) {
 				g_shortened = false;
 				g_skirts.clear();
@@ -900,9 +933,9 @@ namespace Probe
 			} else if (a_k == 2) {
 				// 鎧は重なった板の間隔を保って広げる（比で縮尺すると板が同じ半径に潰れて背中に穴が空いた）。
 				// 切ったスカートが無ければ（丈 100% など）A ラインにはせず、差し替えた脚の腰に当たる所だけ外へ出す（形は元のまま）
-				Band::ShapeSkirt(actor, g_skirts, g_cfg.waist, g_hemNew < 1e8f ? g_hemNew : g_cfg.hem, g_cfg.hipEase, g_cfg.flareAngle, g_armorMode, !g_anyCut);
+				Band::ShapeSkirt(actor, g_skirts, g_cfg.waist, g_hemNew < 1e8f ? g_hemNew : g_curHem, g_cfg.hipEase, g_cfg.flareAngle, g_armorMode, !g_anyCut);
 			} else {
-				Band::FitSkirt(actor, g_skirts, g_hemNew < 1e8f ? g_hemNew : g_cfg.hem, g_cfg.skirtGap, g_cfg.skirtGapNoBone, g_cfg.bodyWeights);
+				Band::FitSkirt(actor, g_skirts, g_hemNew < 1e8f ? g_hemNew : g_curHem, g_cfg.skirtGap, g_cfg.skirtGapNoBone, g_cfg.bodyWeights);
 				g_skirtActors.insert(a_job.id);
 			}
 			a_job.us[a_k] = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t0).count();
@@ -1179,12 +1212,31 @@ namespace Probe
 		float g_dbgLengthPct = -1;  // 開発用（DebugCmd の @hem）。0 より大きければ設定ファイルの「スカート丈」（%）を上書きする
 #endif
 
+		void SyncAdjustPower()
+		{
+			auto player = RE::PlayerCharacter::GetSingleton();
+			auto dh = RE::TESDataHandler::GetSingleton();
+			auto power = dh ? dh->LookupForm<RE::SpellItem>(0x801, "MiniSkirt.esp") : nullptr;
+			if (!player || !power) {
+				return;
+			}
+			const bool has = player->HasSpell(power);
+			if (g_cfg.learnAdjustPower && !has) {
+				player->AddSpell(power);
+				logger::info("調整パワー（MiniSkirt: Adjust Target）を習得しました");
+			} else if (!g_cfg.learnAdjustPower && has) {
+				player->RemoveSpell(power);
+				logger::info("調整パワー（MiniSkirt: Adjust Target）を外しました");
+			}
+		}
+
 		// ゲーム中に設定を変えた（MCM を閉じた）: 設定を読み直し、読み込まれている対象の NPC 全員を元から作り直す
 		void ApplySettings()
 		{
 			const auto t0 = std::chrono::steady_clock::now();
 			const Cfg  old = g_cfg;
 			LoadCfg();
+			SyncAdjustPower();
 			if (g_dbgEnabled >= 0) {
 				g_cfg.enabled = g_dbgEnabled != 0;
 				// 上の「設定:」の行は設定ファイルの値。上書き中だと MCM を変えても効かないので、分かるように書く
@@ -1390,8 +1442,70 @@ namespace Probe
 		Band::EarlyPrepare(g_cfg.bandTop);
 	}
 
+	int TargetHotkey() { return g_cfg.targetHotkey; }
+	bool GlobalEnabled() { return g_cfg.enabled; }
+	bool GlobalExcludeElderly() { return g_cfg.excludeElderly; }
+	float GlobalLengthPct() { return g_cfg.lengthPct; }
+	bool IsActorElderly(RE::Actor* a_actor) { return IsElderly(a_actor); }
+
+	void ReprocessActorNow(RE::FormID a_id)
+	{
+		if (auto tasks = SKSE::GetTaskInterface()) {
+			tasks->AddTask([a_id] {
+				auto actor = RE::TESForm::LookupByID<RE::Actor>(a_id);
+				if (!actor || !actor->Get3D()) {
+					return;
+				}
+				RestoreActor(actor);
+				g_genOf.erase(a_id);
+				ProcessActor(a_id);
+			});
+		}
+	}
+
+	void ReprocessByArmorNow(RE::FormID a_armorId)
+	{
+		if (!a_armorId) {
+			return;
+		}
+		if (auto tasks = SKSE::GetTaskInterface()) {
+			tasks->AddTask([a_armorId] {
+				std::set<RE::FormID> targets(g_seen.begin(), g_seen.end());
+				if (auto pl = RE::ProcessLists::GetSingleton()) {
+					for (auto& h : pl->highActorHandles) {
+						if (auto a = h.get().get()) {
+							targets.insert(a->GetFormID());
+						}
+					}
+				}
+				int count = 0;
+				for (const auto id : targets) {
+					auto actor = RE::TESForm::LookupByID<RE::Actor>(id);
+					if (!actor || !actor->Get3D() || actor->IsPlayerRef()) {
+						continue;
+					}
+					auto worn = actor->GetWornArmor(RE::BGSBipedObjectForm::BipedObjectSlot::kBody);
+					if (worn && worn->GetFormID() == a_armorId) {
+						RestoreActor(actor);
+						g_genOf.erase(id);
+						ProcessActor(id);
+						++count;
+					}
+				}
+				logger::info("衣装別設定の再反映: 衣装 {:08X} の対象 NPC {} 人を更新した", a_armorId, count);
+			});
+		}
+	}
+
+	void OnGameLoaded()
+	{
+		SyncAdjustPower();
+	}
+
 	void Install()
 	{
+		Overrides::Load();
+		TargetMenu::Install();
 		Band::Prepare(g_cfg.bandTop, g_cfg.freezeJiggle);
 		Later(5000, [] { Tick(); });
 		Underwear::Prepare();

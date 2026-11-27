@@ -96,7 +96,38 @@ quest.VirtualMachineAdapter = new QuestAdapter
 	},
 };
 mod.Quests.Add(quest);
-mod.ModHeader.Stats.NextFormID = 0x801;
+
+// VR / ゲームパッド向けの個別調整パワー（目の前の NPC の丈・除外メニューを開く。中身は DLL が TESSpellCastEvent で拾う）
+var adjustEffect = new MagicEffect(new FormKey(modKey, 0x802), Rel)
+{
+	EditorID = "MiniSkirt_AdjustEffect",
+	Name = "MiniSkirt: Adjust Target",
+	Flags = MagicEffect.Flag.NoDuration | MagicEffect.Flag.NoArea | MagicEffect.Flag.NoMagnitude | MagicEffect.Flag.HideInUI,
+	CastType = CastType.FireAndForget,
+	TargetType = TargetType.Self,
+	Archetype = new MagicEffectArchetype { Type = MagicEffectArchetype.TypeEnum.Script },
+};
+mod.MagicEffects.Add(adjustEffect);
+
+var adjustPower = new Spell(new FormKey(modKey, 0x801), Rel)
+{
+	EditorID = "MiniSkirt_AdjustPower",
+	Name = "MiniSkirt: Adjust Target",
+	Type = SpellType.LesserPower,
+	CastType = CastType.FireAndForget,
+	TargetType = TargetType.Self,
+	Effects =
+	{
+		new Effect
+		{
+			BaseEffect = adjustEffect.ToNullableLink(),
+			Data = new EffectData { Magnitude = 0, Area = 0, Duration = 0 },
+		},
+	},
+};
+mod.Spells.Add(adjustPower);
+
+mod.ModHeader.Stats.NextFormID = 0x803;
 
 var espPath = Path.Combine(outDir, "MiniSkirt.esp");
 mod.WriteToBinary(espPath, new BinaryWriteParameters

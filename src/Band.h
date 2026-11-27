@@ -55,6 +55,8 @@ namespace Band
 	Status Check(RE::Actor* a_actor);
 	// 縮める服を着ていなくなった・設定で無効にした・帯の上端を変えたときに、付けた帯を外す（a_why はログ用の理由）
 	void Detach(RE::Actor* a_actor, const char* a_why = "縮める服を着ていない");
+	// 除外・個別設定の NPC の服を、同じ服の別 NPC と共有しない独立した頂点データに差し替える。差し替えた shape の数
+	int EnsureUniqueOutfit(RE::NiAVObject* a_root, const std::string& a_who, RE::FormID a_actorId);
 	// 帯の上端を変える（ゲーム中に MCM で変えたとき。次に付ける帯から新しい上端）
 	void SetTop(float a_top);
 	// NPC の 3D が外れたとき（次に読み込まれたらまた足せるように）

@@ -24,6 +24,10 @@ LAYOUT = [
     {"type": "toggle", "key": "Underwear", "id": "bUnderwear:General"},
     {"type": "slider", "key": "Gap", "id": "fSkirtGap:General", "min": 0, "max": 8, "step": 0.5, "fmt": "{1}"},
     {"type": "slider", "key": "GapStiff", "id": "fSkirtGapNoBone:General", "min": 0, "max": 10, "step": 0.5, "fmt": "{1}"},
+    {"type": "empty"},
+    {"type": "header", "key": "PerTarget"},
+    {"type": "keymap", "key": "TargetHotkey", "id": "iTargetHotkey:General"},
+    {"type": "toggle", "key": "LearnAdjustPower", "id": "bLearnAdjustPower:General"},
 ]
 
 # 日本語のフォントに無い字（例: 裾、≒）は使わない。目安は「数: 説明」の形にする（≒ は空白に見えた）。
@@ -46,6 +50,9 @@ T["JAPANESE"] = {
     "Underwear": ("下着を着ける", "足した脚を、下着を着けた体にします。NPC の持ち物や服装から下着らしい物を選び、無ければ入っている下着 MOD から NPC ごとに 1 つ決めます（下着 MOD が無ければ裸のまま）。"),
     "Gap": ("スカートと脚のすき間", "スカートを脚から離す幅。近すぎる所だけ外へ押し出します（お尻の揺れに合わせてスカートも動く服）。お尻がスカートから突き抜けるときは大きくします。"),
     "GapStiff": ("すき間（スカートが揺れない服）", "お尻が揺れてもスカートがいっしょに動かない服での、スカートと脚のすき間。突き抜けやすいので広めにします。"),
+    "PerTarget": "個別設定（NPC / 衣装）",
+    "TargetHotkey": ("対象を調整するキー", "目の前の女性 NPC に対して、その NPC 個別または着ている衣装ごとのスカート丈・除外を設定するメニューを開きます。設定は全セーブ共通のファイルに保存されます。"),
+    "LearnAdjustPower": ("調整パワーを習得（VR / パッド向け）", "オンにすると、目の前の女性 NPC の丈・除外メニューを開くパワー「MiniSkirt: Adjust Target」を習得します。キーボードを使わない VR やコントローラー環境で便利です。"),
 }
 
 T["ENGLISH"] = {
@@ -64,6 +71,9 @@ T["ENGLISH"] = {
     "Underwear": ("Wear underwear", "Puts underwear on the added legs. Picks something underwear-like from the NPC's inventory or outfit; otherwise picks one per NPC from installed underwear mods (bare if there are none)."),
     "Gap": ("Gap between skirt and legs", "How far the skirt is kept from the legs. Only the parts that are too close are pushed out (outfits whose skirt moves with the buttocks). Increase it if the buttocks poke through."),
     "GapStiff": ("Gap (skirts that don't sway)", "Gap between skirt and legs for outfits whose skirt does not move when the buttocks jiggle. Set it wider, since these poke through more easily."),
+    "PerTarget": "Per-NPC / Per-Outfit",
+    "TargetHotkey": ("Adjust Target Hotkey", "Press while looking at a female NPC to change the skirt length or exclusion for that NPC or their outfit. Saved to a shared config file across all saves."),
+    "LearnAdjustPower": ("Learn Adjust Power (VR / Gamepad)", "When on, grants the lesser power 'MiniSkirt: Adjust Target' to open the per-NPC / per-outfit menu without a keyboard."),
 }
 
 T["FRENCH"] = {
@@ -82,6 +92,9 @@ T["FRENCH"] = {
     "Underwear": ("Porter des sous-vêtements", "Ajoute des sous-vêtements aux jambes ajoutées. Choisit un sous-vêtement dans l'inventaire ou la tenue du PNJ ; sinon un par PNJ parmi les mods de sous-vêtements installés (nu s'il n'y en a pas)."),
     "Gap": ("Écart jupe / jambes", "Distance gardée entre la jupe et les jambes. Seules les parties trop proches sont repoussées (tenues dont la jupe suit le mouvement des fesses). Augmentez si les fesses traversent."),
     "GapStiff": ("Écart (jupes rigides)", "Écart pour les tenues dont la jupe ne suit pas le mouvement des fesses. Mettez-le plus grand, car elles traversent plus facilement."),
+    "PerTarget": "Par PNJ / Par tenue",
+    "TargetHotkey": ("Touche d'ajustement", "Appuyez en regardant un PNJ féminin pour régler la longueur ou l'exclusion pour ce PNJ ou sa tenue."),
+    "LearnAdjustPower": ("Pouvoir d'ajustement (VR / Manette)", "Active le pouvoir 'MiniSkirt: Adjust Target' pour ouvrir le menu sans clavier."),
 }
 
 T["GERMAN"] = {
@@ -100,6 +113,9 @@ T["GERMAN"] = {
     "Underwear": ("Unterwäsche tragen", "Gibt den hinzugefügten Beinen Unterwäsche. Wählt etwas Passendes aus Inventar oder Kleidung des NPCs, sonst pro NPC eines aus installierten Unterwäsche-Mods (nackt, wenn keine vorhanden)."),
     "Gap": ("Abstand Rock / Beine", "Abstand, den der Rock zu den Beinen hält. Nur zu nahe Stellen werden nach außen gedrückt (Kleidung, deren Rock sich mit dem Po bewegt). Erhöhen, wenn der Po durchragt."),
     "GapStiff": ("Abstand (starre Röcke)", "Abstand für Kleidung, deren Rock sich nicht mit dem Po mitbewegt. Größer wählen, da sie leichter durchragt."),
+    "PerTarget": "Pro NPC / Pro Kleidung",
+    "TargetHotkey": ("Taste zum Anpassen", "Drücken, während ein weiblicher NPC anvisiert wird, um Länge oder Ausnahme für diesen NPC oder die Kleidung einzustellen."),
+    "LearnAdjustPower": ("Anpassungskraft lernen (VR / Controller)", "Verleiht die Kraft 'MiniSkirt: Adjust Target', um das Menü ohne Tastatur zu öffnen."),
 }
 
 T["SPANISH"] = {
@@ -118,6 +134,9 @@ T["SPANISH"] = {
     "Underwear": ("Llevar ropa interior", "Pone ropa interior en las piernas añadidas. Elige algo del inventario o atuendo del PNJ; si no hay, una por PNJ de los mods de ropa interior instalados (desnudo si no hay ninguno)."),
     "Gap": ("Separación falda / piernas", "Distancia que la falda guarda respecto a las piernas. Solo se empujan hacia fuera las partes demasiado cercanas (ropa cuya falda se mueve con los glúteos). Auméntala si los glúteos la atraviesan."),
     "GapStiff": ("Separación (faldas rígidas)", "Separación para ropa cuya falda no se mueve con los glúteos. Ponla más amplia, ya que se atraviesa con más facilidad."),
+    "PerTarget": "Por PNJ / Por atuendo",
+    "TargetHotkey": ("Tecla de ajuste", "Pulsa mirando a una PNJ para cambiar el largo o la exclusión de esa PNJ o su atuendo."),
+    "LearnAdjustPower": ("Aprender poder de ajuste (VR / Mando)", "Otorga el poder 'MiniSkirt: Adjust Target' para abrir el menú sin teclado."),
 }
 
 T["ITALIAN"] = {
@@ -136,6 +155,9 @@ T["ITALIAN"] = {
     "Underwear": ("Indossa biancheria", "Aggiunge biancheria intima alle gambe aggiunte. Sceglie qualcosa dall'inventario o dal vestito del PNG; altrimenti una per PNG dalle mod di biancheria installate (nuda se non ce ne sono)."),
     "Gap": ("Distanza gonna / gambe", "Distanza che la gonna mantiene dalle gambe. Solo le parti troppo vicine vengono spinte fuori (vestiti la cui gonna si muove con i glutei). Aumentala se i glutei la attraversano."),
     "GapStiff": ("Distanza (gonne rigide)", "Distanza per i vestiti la cui gonna non si muove con i glutei. Impostala più ampia, perché si attraversa più facilmente."),
+    "PerTarget": "Per PNG / Per abito",
+    "TargetHotkey": ("Tasto di regolazione", "Premi guardando un PNG femminile per cambiare lunghezza o esclusione per quel PNG o il suo abito."),
+    "LearnAdjustPower": ("Impara potere di regolazione (VR / Pad)", "Concede il potere 'MiniSkirt: Adjust Target' per aprire il menu senza tastiera."),
 }
 
 T["POLISH"] = {
@@ -154,6 +176,9 @@ T["POLISH"] = {
     "Underwear": ("Noś bieliznę", "Dodaje bieliznę do dodanych nóg. Wybiera coś z ekwipunku lub stroju NPC; w przeciwnym razie jedną na NPC z zainstalowanych modów z bielizną (nago, jeśli ich brak)."),
     "Gap": ("Odstęp spódnica / nogi", "Odstęp spódnicy od nóg. Na zewnątrz odsuwane są tylko zbyt bliskie miejsca (stroje, których spódnica porusza się z pośladkami). Zwiększ, jeśli pośladki przebijają."),
     "GapStiff": ("Odstęp (sztywne spódnice)", "Odstęp dla strojów, których spódnica nie porusza się z pośladkami. Ustaw większy, bo łatwiej je przebić."),
+    "PerTarget": "Dla NPC / Dla stroju",
+    "TargetHotkey": ("Klawisz regulacji", "Naciśnij patrząc na kobiecego NPC, aby ustawić długość lub wykluczenie dla tej postaci lub stroju."),
+    "LearnAdjustPower": ("Moc regulacji (VR / Pad)", "Dodaje moc 'MiniSkirt: Adjust Target' do otwierania menu bez klawiatury."),
 }
 
 T["RUSSIAN"] = {
@@ -172,6 +197,9 @@ T["RUSSIAN"] = {
     "Underwear": ("Носить бельё", "Добавляет бельё на добавленные ноги. Выбирает подходящее из инвентаря или одежды NPC; иначе — по одному на NPC из установленных модов белья (голые, если их нет)."),
     "Gap": ("Зазор юбка / ноги", "Насколько юбка отстоит от ног. Наружу сдвигаются только слишком близкие места (одежда, юбка которой движется вместе с ягодицами). Увеличьте, если ягодицы проходят насквозь."),
     "GapStiff": ("Зазор (жёсткие юбки)", "Зазор для одежды, юбка которой не движется вместе с ягодицами. Ставьте больше — сквозь них проходит легче."),
+    "PerTarget": "Для NPC / Для одежды",
+    "TargetHotkey": ("Клавиша настройки", "Нажмите, глядя на женского NPC, чтобы изменить длину или исключение для этого NPC или его одежды."),
+    "LearnAdjustPower": ("Способность настройки (VR / Геймпад)", "Добавляет способность 'MiniSkirt: Adjust Target' для открытия меню без клавиатуры."),
 }
 
 T["CZECH"] = {
@@ -190,6 +218,9 @@ T["CZECH"] = {
     "Underwear": ("Nosit spodní prádlo", "Přidá spodní prádlo na přidané nohy. Vybere něco z inventáře nebo oblečení NPC; jinak jedno na NPC z nainstalovaných modů prádla (nahé, pokud žádné nejsou)."),
     "Gap": ("Mezera sukně / nohy", "Jak daleko sukně zůstává od nohou. Ven se odsunou jen příliš blízká místa (oblečení, jehož sukně se hýbe s hýžděmi). Zvyšte, pokud hýždě prochází."),
     "GapStiff": ("Mezera (tuhé sukně)", "Mezera pro oblečení, jehož sukně se nehýbe s hýžděmi. Nastavte větší, protože se snáze prochází."),
+    "PerTarget": "Pro NPC / Pro oblečení",
+    "TargetHotkey": ("Klávesa úpravy", "Stiskněte při pohledu na ženské NPC pro nastavení délky nebo vynechání daného NPC či oblečení."),
+    "LearnAdjustPower": ("Schopnost úpravy (VR / Ovladač)", "Přidá schopnost 'MiniSkirt: Adjust Target' pro otevření menu bez klávesnice."),
 }
 
 T["CHINESE"] = {  # 簡体字（中国語の枠はゲームに 1 つだけ。利用者の多い簡体字にした）
@@ -208,6 +239,9 @@ T["CHINESE"] = {  # 簡体字（中国語の枠はゲームに 1 つだけ。利
     "Underwear": ("穿上内衣", "让添加的双腿穿上内衣。会从 NPC 的物品或服装中挑选类似内衣的物品；如果没有，则从已安装的内衣 MOD 中为每个 NPC 选一件（没有内衣 MOD 则保持裸露）。"),
     "Gap": ("裙子与双腿的间隙", "裙子与双腿保持的距离。只把太靠近的部分向外推（裙子会随臀部摆动的服装）。臀部穿出时请调大。"),
     "GapStiff": ("间隙（不会摆动的裙子）", "臀部摆动时裙子不会跟着动的服装所用的间隙。更容易穿出，请设大一些。"),
+    "PerTarget": "单独设置（NPC / 服装）",
+    "TargetHotkey": ("调整目标热键", "面对女性 NPC 按下此键，可单独调整该 NPC 或其服装的裙长和排除设置。设置保存在所有存档通用的文件中。"),
+    "LearnAdjustPower": ("习得调整能力（VR / 手柄）", "开启后会获得能力 'MiniSkirt: Adjust Target'，无需键盘即可打开单独设置菜单。"),
 }
 
 
@@ -233,6 +267,8 @@ def build_config():
             e["valueOptions"] = {"sourceType": "ModSettingBool"}
         elif t == "stepper":
             e["valueOptions"] = {"options": [key(o, "Text") for o in item["options"]], "sourceType": "ModSettingInt"}
+        elif t == "keymap":
+            e["valueOptions"] = {"sourceType": "ModSettingInt"}
         else:
             e["valueOptions"] = {"min": item["min"], "max": item["max"], "step": item["step"], "formatString": item["fmt"], "sourceType": "ModSettingFloat"}
         content.append(e)

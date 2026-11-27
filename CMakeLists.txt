@@ -33,6 +33,8 @@ if(NOT COMMAND add_commonlibsse_plugin)
 	include("${MINISKIRT_COMMONLIB_DIR}/cmake/CommonLibSSE.cmake")
 endif()
 
+find_package(nlohmann_json CONFIG REQUIRED)
+
 add_commonlibsse_plugin(
 	MiniSkirt
 	AUTHOR "pentarow55"
@@ -45,6 +47,10 @@ add_commonlibsse_plugin(
 		src/Band.h
 		src/BodyMorph.h
 		src/BodyMorph.cpp
+		src/Overrides.h
+		src/Overrides.cpp
+		src/TargetMenu.h
+		src/TargetMenu.cpp
 		src/DevFlags.h
 		src/Band.cpp
 		src/Layout.h
@@ -52,6 +58,8 @@ add_commonlibsse_plugin(
 		src/Underwear.h
 		src/Underwear.cpp
 )
+
+target_link_libraries(MiniSkirt PRIVATE nlohmann_json::nlohmann_json)
 
 target_precompile_headers(MiniSkirt PRIVATE src/PCH.h)
 

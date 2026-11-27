@@ -25,6 +25,8 @@
 
 #include "Band.h"
 #include "DevFlags.h"
+#include "Overrides.h"
+#include "TargetMenu.h"
 
 #include <chrono>
 #include <filesystem>
@@ -36,6 +38,8 @@ namespace Probe
 {
 	void DebugSetEnabled(int a_on);
 	void DebugSetLength(float a_cm);
+	void ReprocessActorNow(RE::FormID a_id);
+	void ReprocessByArmorNow(RE::FormID a_armorId);
 }
 
 namespace DebugCmd
@@ -367,6 +371,54 @@ namespace DebugCmd
 				pick.rayInput.filterInfo.SetCollisionLayer(RE::COL_LAYER::kLOS);
 				world->PickObject(pick);
 				Result(std::format("ray {:.3f}", pick.rayOutput.HasHit() ? pick.rayOutput.hitFraction : 1.0f));
+			} else if (a_line.rfind("@override ", 0) == 0) {
+				std::istringstream ss(a_line.substr(10));
+				std::string        scope, hex, val;
+				ss >> scope >> hex >> val;
+				const auto id = static_cast<RE::FormID>(std::stoul(hex, nullptr, 16));
+				auto       actor = RE::TESForm::LookupByID<RE::Actor>(id);
+				if (!actor) {
+					Result("override-failed no-actor");
+					return;
+				}
+				if (scope == "npc") {
+					if (val == "clear") {
+						Overrides::ClearNpc(actor);
+					} else if (val == "off") {
+						Overrides::SetNpcEnabled(actor, false);
+					} else if (val == "on") {
+						Overrides::SetNpcEnabled(actor, true);
+					} else {
+						Overrides::SetNpcLength(actor, std::stof(val));
+					}
+					Probe::ReprocessActorNow(id);
+					Result(std::format("override npc {:08X} {}", id, val));
+				} else if (scope == "outfit") {
+					auto armor = actor->GetWornArmor(RE::BGSBipedObjectForm::BipedObjectSlot::kBody);
+					if (!armor) {
+						Result("override-failed no-armor");
+						return;
+					}
+					if (val == "clear") {
+						Overrides::ClearOutfit(armor);
+					} else if (val == "off") {
+						Overrides::SetOutfitEnabled(armor, false);
+					} else if (val == "on") {
+						Overrides::SetOutfitEnabled(armor, true);
+					} else {
+						Overrides::SetOutfitLength(armor, std::stof(val));
+					}
+					Probe::ReprocessByArmorNow(armor->GetFormID());
+					Result(std::format("override outfit {:08X} {}", armor->GetFormID(), val));
+				}
+			} else if (a_line.rfind("@targetmenu", 0) == 0) {
+				if (a_line.size() > 12) {
+					const auto id = static_cast<RE::FormID>(std::stoul(a_line.substr(12), nullptr, 16));
+					TargetMenu::OpenForActor(RE::TESForm::LookupByID<RE::Actor>(id));
+				} else {
+					TargetMenu::OpenForLookedAt();
+				}
+				Result("targetmenu opened");
 			} else if (a_line.rfind("@done ", 0) == 0) {
 				Result("done " + a_line.substr(6));
 			} else if (!a_line.empty()) {

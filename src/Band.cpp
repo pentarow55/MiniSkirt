@@ -660,7 +660,7 @@ namespace Band
 		// 頂点は元の nif と共有なので、頂点の写しと頂点バッファを自前で作る（面・骨・重みの配列は元と共有）。
 		// 寄せる頂点が無ければ nullptr（a_why は空）。作れなければ nullptr と理由
 		RE::NiSkinPartition* MakeMovedPartition(RE::NiSkinPartition* a_orig, const std::vector<std::array<float, 3>>& a_pos, const std::vector<char>& a_hit,
-			std::string& a_why);
+			std::string& a_why, const std::vector<std::uint8_t>* a_full = nullptr);
 
 		RE::NiSkinPartition* MakeTuckedPartition(RE::NiSkinPartition* a_orig, float a_zOff, const std::vector<SkinPt>& a_skin, float a_limit, std::string& a_why,
 			int& a_moved, float& a_maxMove)
@@ -764,7 +764,7 @@ namespace Band
 		// a_hit の頂点の位置だけ a_pos に置き換えた自前の skinPartition を作る。頂点の写しと頂点バッファは自前（面・骨・重みの配列は a_orig と共有）。
 		// 区画ごとに buffData が別で、頂点バッファの大きさが頂点の数どおりであること。作れなければ nullptr と理由
 		RE::NiSkinPartition* MakeMovedPartition(RE::NiSkinPartition* a_orig, const std::vector<std::array<float, 3>>& a_pos, const std::vector<char>& a_hit,
-			std::string& a_why)
+			std::string& a_why, const std::vector<std::uint8_t>* a_full)
 		{
 			auto rtti = a_orig->GetRTTI();
 			if (!rtti || !rtti->GetName() || std::string_view(rtti->GetName()) != "NiSkinPartition") {
@@ -817,7 +817,8 @@ namespace Band
 					a_why = "メモリが取れない";
 					return nullptr;  // 取れた分はわずかなので捨てる（解放しない）
 				}
-				std::memcpy(raws[i], a_orig->partitions[i].buffData->rawVertexData, static_cast<std::size_t>(nv) * stride);
+				const bool whole = a_full && a_full->size() == static_cast<std::size_t>(nv) * stride;
+				std::memcpy(raws[i], whole ? a_full->data() : a_orig->partitions[i].buffData->rawVertexData, static_cast<std::size_t>(nv) * stride);
 				for (std::uint32_t v = 0; v < nv; ++v) {
 					if (hit[v]) {
 						std::memcpy(raws[i] + static_cast<std::size_t>(v) * stride, moved[v].data(), 12);
@@ -3269,5 +3270,55 @@ namespace Band
 					useB ? std::format("スカートにある {}", found) : std::string("スカートの骨の一覧に無い"), blended);
 			}
 		}
+	}
+
+	int EnsureUniqueOutfit(RE::NiAVObject* a_root, const std::string& a_who, RE::FormID a_actorId)
+	{
+		if (!a_root) {
+			return 0;
+		}
+		static std::unordered_set<const void*> s_uniqueParts;
+		std::vector<RE::BSGeometry*>           geos;
+		CollectSkinned(a_root, geos);
+		int separated = 0;
+		for (auto geo : geos) {
+			auto skin = geo->GetGeometryRuntimeData().skinInstance.get();
+			auto part = skin ? skin->skinPartition.get() : nullptr;
+			if (!part || !part->numPartitions || !part->vertexCount) {
+				continue;
+			}
+			if (s_uniqueParts.contains(part)) {
+				continue;  // すでにこの NPC 専用の独立バッファ
+			}
+			auto b0 = part->partitions[0].buffData;
+			if (!b0 || !b0->rawVertexData) {
+				continue;
+			}
+			// 元頂点が保存されていれば元の長さから、無ければ現在の頂点から独立コピーを作る
+			const std::vector<std::uint8_t>* full = nullptr;
+			const auto                       tkey = Verts::TopoKey(part, b0, part->vertexCount, skin);
+			const auto                       vkey = Verts::VertKey(b0, part->vertexCount, skin);
+			if (auto it = Verts::g_pristine.find({ a_actorId, tkey }); it != Verts::g_pristine.end()) {
+				full = &it->second;
+			} else if (auto gt = Verts::g_pristine.find({ 0u, tkey }); gt != Verts::g_pristine.end()) {
+				full = &gt->second;
+			} else if (auto jt = Verts::g_pristineByVerts.find(vkey); jt != Verts::g_pristineByVerts.end()) {
+				full = &jt->second;
+			}
+			std::string why;
+			auto        copy = MakeMovedPartition(part, std::vector<std::array<float, 3>>(part->vertexCount), std::vector<char>(part->vertexCount, 0), why, full);
+			if (!copy) {
+				logger::info("  個別分離: {} [{}] 分離できない（{}）", a_who, geo->name.c_str(), why);
+				continue;
+			}
+			part->IncRefCount();  // 配列を共有しているため元を手放さない
+			skin->skinPartition = RE::NiPointer<RE::NiSkinPartition>(copy);
+			s_uniqueParts.insert(copy);
+			++separated;
+		}
+		if (separated > 0) {
+			logger::info("  個別分離: {} の服 shape {} 個を独立バッファへ分離した", a_who, separated);
+		}
+		return separated;
 	}
 }
