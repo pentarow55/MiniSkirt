@@ -4,20 +4,25 @@
 
 #include "Overrides.h"
 
+#include <Windows.h>
+
+#include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <functional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace Probe
 {
-	int  TargetHotkey();
-	bool GlobalEnabled();
-	bool GlobalExcludeElderly();
+	int   TargetHotkey();
+	bool  GlobalEnabled();
+	bool  GlobalExcludeElderly();
 	float GlobalLengthPct();
-	bool IsActorElderly(RE::Actor* a_actor);
-	void ReprocessActorNow(RE::FormID a_id);
-	void ReprocessByArmorNow(RE::FormID a_armorId);
+	bool  IsActorElderly(RE::Actor* a_actor);
+	void  ReprocessActorNow(RE::FormID a_id);
+	void  ReprocessByArmorNow(RE::FormID a_armorId);
 }
 
 namespace TargetMenu
@@ -27,6 +32,118 @@ namespace TargetMenu
 		constexpr const char* kPluginName = "MiniSkirt.esp";
 		constexpr RE::FormID  kAdjustPowerLocalId = 0x801;
 
+		// ---- 翻訳ファイル読み込み（ゲームの sLanguage に連動） ----
+		std::unordered_map<std::string, std::string> g_i18n;
+		bool                                         g_i18nLoaded = false;
+
+		struct StreamReader : RE::BSResourceNiBinaryStream
+		{
+			using RE::BSResourceNiBinaryStream::BSResourceNiBinaryStream;
+			using RE::NiBinaryStream::binary_read;
+		};
+
+		std::string Upper(std::string a_s)
+		{
+			for (auto& c : a_s) {
+				c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+			}
+			return a_s;
+		}
+
+		std::string WideToUtf8(const wchar_t* a_w, int a_len)
+		{
+			if (!a_w || a_len <= 0) {
+				return {};
+			}
+			const int need = WideCharToMultiByte(CP_UTF8, 0, a_w, a_len, nullptr, 0, nullptr, nullptr);
+			if (need <= 0) {
+				return {};
+			}
+			std::string out(static_cast<std::size_t>(need), '\0');
+			WideCharToMultiByte(CP_UTF8, 0, a_w, a_len, out.data(), need, nullptr, nullptr);
+			return out;
+		}
+
+		bool TryLoadTranslationFile(const std::string& a_lang)
+		{
+			const std::string path = std::format("Interface\\Translations\\MiniSkirt_{}.txt", a_lang);
+			StreamReader      in(path);
+			if (!in.good()) {
+				return false;
+			}
+			std::vector<std::uint8_t> bytes;
+			std::uint8_t              buf[4096];
+			for (;;) {
+				std::uint32_t sz = 1;
+				const auto    n = in.binary_read(buf, sizeof(buf), &sz, 1);
+				if (n == 0) {
+					break;
+				}
+				bytes.insert(bytes.end(), buf, buf + n);
+			}
+			if (bytes.size() < 4) {
+				return false;
+			}
+			std::size_t off = 0;
+			if (bytes[0] == 0xFF && bytes[1] == 0xFE) {
+				off = 2;
+			}
+			const auto     wcount = (bytes.size() - off) / 2;
+			std::wstring   wtext(wcount, L'\0');
+			std::memcpy(wtext.data(), bytes.data() + off, wcount * 2);
+			const auto utf8 = WideToUtf8(wtext.data(), static_cast<int>(wtext.size()));
+
+			g_i18n.clear();
+			std::size_t pos = 0;
+			while (pos < utf8.size()) {
+				auto nl = utf8.find('\n', pos);
+				if (nl == std::string::npos) {
+					nl = utf8.size();
+				}
+				std::string line = utf8.substr(pos, nl - pos);
+				pos = nl + 1;
+				if (!line.empty() && line.back() == '\r') {
+					line.pop_back();
+				}
+				const auto tab = line.find('\t');
+				if (tab == std::string::npos || tab == 0) {
+					continue;
+				}
+				g_i18n[line.substr(0, tab)] = line.substr(tab + 1);
+			}
+			logger::info("TargetMenu: 翻訳ファイルを読み込みました: {} ({} 件)", path, g_i18n.size());
+			return !g_i18n.empty();
+		}
+
+		void EnsureTranslations()
+		{
+			if (g_i18nLoaded) {
+				return;
+			}
+			g_i18nLoaded = true;
+			std::string lang = "ENGLISH";
+			if (auto ini = RE::INISettingCollection::GetSingleton()) {
+				if (auto s = ini->GetSetting("sLanguage:General"); s && s->GetType() == RE::Setting::Type::kString) {
+					if (const char* v = s->GetString(); v && *v) {
+						lang = Upper(v);
+					}
+				}
+			}
+			if (!TryLoadTranslationFile(lang) && lang != "ENGLISH") {
+				TryLoadTranslationFile("ENGLISH");
+			}
+		}
+
+		std::string Tr(const char* a_key, const char* a_fallback)
+		{
+			EnsureTranslations();
+			if (auto it = g_i18n.find(a_key); it != g_i18n.end() && !it->second.empty()) {
+				return it->second;
+			}
+			return a_fallback;
+		}
+
+		// ---- ネイティブ選択肢メッセージボックス ----
 		class Callback : public RE::IMessageBoxCallback
 		{
 		public:
@@ -88,7 +205,6 @@ namespace TargetMenu
 
 		RE::Actor* FindLookedAtFemale()
 		{
-			// 1. クロスヘア／VR ポインターの対象を最優先
 			if (auto pick = RE::CrosshairPickData::GetSingleton()) {
 				auto handle = pick->GetActiveTarget();
 				if (auto ref = handle.get()) {
@@ -98,7 +214,6 @@ namespace TargetMenu
 				}
 			}
 
-			// 2. 見つからなければプレイヤーの正面（±35°・距離 450u 以内）の最寄り女性 NPC
 			auto player = RE::PlayerCharacter::GetSingleton();
 			auto pl = RE::ProcessLists::GetSingleton();
 			if (!player || !pl) {
@@ -129,7 +244,7 @@ namespace TargetMenu
 					continue;
 				}
 				const float dot = (dx * fwdX + dy * fwdY) / horiz;
-				if (dot < 0.80f) {  // 約 ±37° 以内
+				if (dot < 0.80f) {
 					continue;
 				}
 				const float score = dist * (1.5f - dot);
@@ -141,15 +256,15 @@ namespace TargetMenu
 			return best;
 		}
 
-		const char* SourceLabel(Overrides::Source a_src)
+		std::string SourceLabel(Overrides::Source a_src)
 		{
 			switch (a_src) {
 			case Overrides::Source::kNpc:
-				return "NPC";
+				return Tr("$MSK_MenuSrcNpc", "NPC");
 			case Overrides::Source::kOutfit:
-				return "Outfit";
+				return Tr("$MSK_MenuSrcOutfit", "Outfit");
 			default:
-				return "Global";
+				return Tr("$MSK_MenuSrcGlobal", "Global");
 			}
 		}
 
@@ -161,56 +276,69 @@ namespace TargetMenu
 				return;
 			}
 			if (!a_forNpc && !armor) {
-				RE::SendHUDMessage::ShowHUDMessage("MiniSkirt: Target is not wearing a body outfit.");
+				RE::SendHUDMessage::ShowHUDMessage(Tr("$MSK_MenuNoOutfit", "MiniSkirt: Target is not wearing a body outfit.").c_str());
 				return;
 			}
 
-			const std::string targetLabel = a_forNpc ?
-			                                    std::format("NPC: {}", actor->GetDisplayFullName()) :
-			                                    std::format("Outfit: {}", armor->GetName() && *armor->GetName() ? armor->GetName() : "(Unnamed)");
-			const std::string body = std::format("MiniSkirt - Select Skirt Length\n{}", targetLabel);
+			const bool elderlyExcl = Probe::GlobalExcludeElderly() && Probe::IsActorElderly(actor);
+			const auto res = Overrides::Resolve(actor, armor, Probe::GlobalEnabled(), elderlyExcl, Probe::GlobalLengthPct());
+			const int  curPct = std::clamp(static_cast<int>(std::lround(res.lengthPct)), 10, 100);
 
-			static constexpr float kPresets[] = { 15.0f, 25.0f, 35.0f, 50.0f, 70.0f, 100.0f };
+			const std::string targetLabel = a_forNpc ?
+			                                    std::format("{}: {}", Tr("$MSK_MenuTargetNpc", "NPC"), actor->GetDisplayFullName()) :
+			                                    std::format("{}: {}", Tr("$MSK_MenuTargetOutfit", "Outfit"),
+			                                        armor->GetName() && *armor->GetName() ? armor->GetName() : "(Unnamed)");
+			const std::string body = std::format("{}\n{}\n{}: {}% [{}]", Tr("$MSK_MenuLenTitle", "Adjust Skirt Length (10-100%)"), targetLabel,
+				Tr("$MSK_MenuCurrentLabel", "Current"), curPct, SourceLabel(res.lengthSource));
+
+			static constexpr int kDeltas[] = { -10, -5, -1, +1, +5, +10 };
 			std::vector<std::string> buttons = {
-				"15% (Micro Mini)",
-				"25% (Mini)",
-				"35% (Short)",
-				"50% (Knee)",
-				"70% (Long)",
-				"100% (Original Length)",
-				"Reset Length to Default",
-				"Back",
+				"-10%",
+				"-5%",
+				"-1%",
+				"+1%",
+				"+5%",
+				"+10%",
+				Tr("$MSK_MenuBtnLen100", "100% (Original Length)"),
+				Tr("$MSK_MenuBtnResetLen", "Reset Length to Default"),
+				Tr("$MSK_MenuBtnDone", "Done"),
 			};
 
-			ShowMenu(body, buttons, [a_actorId, a_armorId, a_forNpc](std::int32_t a_idx) {
+			ShowMenu(body, buttons, [a_actorId, a_armorId, a_forNpc, curPct](std::int32_t a_idx) {
 				auto act = RE::TESForm::LookupByID<RE::Actor>(a_actorId);
 				auto arm = a_armorId ? RE::TESForm::LookupByID<RE::TESObjectARMO>(a_armorId) : nullptr;
 				if (!act) {
 					return;
 				}
 				if (a_idx >= 0 && a_idx < 6) {
-					const float pct = kPresets[a_idx];
+					const float nextPct = static_cast<float>(std::clamp(curPct + kDeltas[a_idx], 10, 100));
 					if (a_forNpc) {
-						Overrides::SetNpcLength(act, pct);
+						Overrides::SetNpcLength(act, nextPct);
 						Probe::ReprocessActorNow(a_actorId);
-						RE::SendHUDMessage::ShowHUDMessage(std::format("MiniSkirt: {} -> {:.0f}%", act->GetDisplayFullName(), pct).c_str());
 					} else if (arm) {
-						Overrides::SetOutfitLength(arm, pct);
+						Overrides::SetOutfitLength(arm, nextPct);
 						Probe::ReprocessByArmorNow(a_armorId);
-						RE::SendHUDMessage::ShowHUDMessage(std::format("MiniSkirt: Outfit {} -> {:.0f}%", arm->GetName(), pct).c_str());
 					}
+					// 即時反映させつつ同じ調整画面を開き直し、1% 刻みで追い込めるようにする
+					OpenLengthSubMenu(a_actorId, a_armorId, a_forNpc);
 				} else if (a_idx == 6) {
+					if (a_forNpc) {
+						Overrides::SetNpcLength(act, 100.0f);
+						Probe::ReprocessActorNow(a_actorId);
+					} else if (arm) {
+						Overrides::SetOutfitLength(arm, 100.0f);
+						Probe::ReprocessByArmorNow(a_armorId);
+					}
+					OpenLengthSubMenu(a_actorId, a_armorId, a_forNpc);
+				} else if (a_idx == 7) {
 					if (a_forNpc) {
 						Overrides::SetNpcLength(act, std::nullopt);
 						Probe::ReprocessActorNow(a_actorId);
-						RE::SendHUDMessage::ShowHUDMessage(std::format("MiniSkirt: {} length reset", act->GetDisplayFullName()).c_str());
 					} else if (arm) {
 						Overrides::SetOutfitLength(arm, std::nullopt);
 						Probe::ReprocessByArmorNow(a_armorId);
-						RE::SendHUDMessage::ShowHUDMessage(std::format("MiniSkirt: Outfit {} length reset", arm->GetName()).c_str());
 					}
-				} else if (a_idx == 7) {
-					OpenForActor(act);
+					OpenLengthSubMenu(a_actorId, a_armorId, a_forNpc);
 				}
 			});
 		}
@@ -277,6 +405,8 @@ namespace TargetMenu
 		}
 		g_installed = true;
 
+		EnsureTranslations();
+
 		if (auto idm = RE::BSInputDeviceManager::GetSingleton()) {
 			idm->AddEventSink(&g_inputSink);
 			logger::info("TargetMenu: ホットキー入力を購読しました");
@@ -291,7 +421,7 @@ namespace TargetMenu
 	{
 		auto actor = FindLookedAtFemale();
 		if (!actor) {
-			RE::SendHUDMessage::ShowHUDMessage("MiniSkirt: No female NPC in front of you.");
+			RE::SendHUDMessage::ShowHUDMessage(Tr("$MSK_MenuNoTarget", "MiniSkirt: No female NPC in front of you.").c_str());
 			return;
 		}
 		OpenForActor(actor);
@@ -300,7 +430,7 @@ namespace TargetMenu
 	void OpenForActor(RE::Actor* a_actor)
 	{
 		if (!IsValidFemaleTarget(a_actor)) {
-			RE::SendHUDMessage::ShowHUDMessage("MiniSkirt: Target is not a valid female NPC.");
+			RE::SendHUDMessage::ShowHUDMessage(Tr("$MSK_MenuNoTarget", "MiniSkirt: No female NPC in front of you.").c_str());
 			return;
 		}
 		const auto actorId = a_actor->GetFormID();
@@ -313,10 +443,11 @@ namespace TargetMenu
 		const std::string npcName = a_actor->GetDisplayFullName();
 		const std::string armName = armor && armor->GetName() && *armor->GetName() ? armor->GetName() : "(None)";
 		const std::string status = res.enabled ?
-		                               std::format("Enabled ({:.0f}% [{}])", res.lengthPct, SourceLabel(res.lengthSource)) :
-		                               std::format("Excluded ([{}])", SourceLabel(res.enabledSource));
+		                               std::format("{} ({:.0f}% [{}])", Tr("$MSK_MenuEnabled", "Enabled"), res.lengthPct, SourceLabel(res.lengthSource)) :
+		                               std::format("{} ([{}])", Tr("$MSK_MenuExcluded", "Excluded"), SourceLabel(res.enabledSource));
 
-		const std::string body = std::format("MiniSkirt: {}\nOutfit: {}\nCurrent: {}", npcName, armName, status);
+		const std::string body = std::format("MiniSkirt: {}\n{}: {}\n{}: {}", npcName, Tr("$MSK_MenuOutfitLabel", "Outfit"), armName,
+			Tr("$MSK_MenuCurrentLabel", "Current"), status);
 
 		const auto npcRule = Overrides::GetNpcRule(a_actor);
 		const auto armRule = Overrides::GetOutfitRule(armor);
@@ -324,12 +455,12 @@ namespace TargetMenu
 		const bool armExcluded = armRule && armRule->enabled.has_value() && !*armRule->enabled;
 
 		std::vector<std::string> buttons = {
-			"NPC: Change Length...",
-			npcExcluded ? "NPC: Enable (Clear Exclude)" : "NPC: Exclude (Keep Original)",
-			"Outfit: Change Length...",
-			armExcluded ? "Outfit: Enable (Clear Exclude)" : "Outfit: Exclude (Keep Original)",
-			"Clear NPC & Outfit Overrides",
-			"Close",
+			Tr("$MSK_MenuBtnNpcLen", "NPC: Adjust Length..."),
+			npcExcluded ? Tr("$MSK_MenuBtnNpcEn", "NPC: Enable (Clear Exclude)") : Tr("$MSK_MenuBtnNpcExcl", "NPC: Exclude (Keep Original)"),
+			Tr("$MSK_MenuBtnOutLen", "Outfit: Adjust Length..."),
+			armExcluded ? Tr("$MSK_MenuBtnOutEn", "Outfit: Enable (Clear Exclude)") : Tr("$MSK_MenuBtnOutExcl", "Outfit: Exclude (Keep Original)"),
+			Tr("$MSK_MenuBtnClearAll", "Clear NPC & Outfit Overrides"),
+			Tr("$MSK_MenuBtnClose", "Close"),
 		};
 
 		ShowMenu(body, buttons, [actorId, armorId, npcExcluded, armExcluded](std::int32_t a_idx) {
@@ -345,8 +476,9 @@ namespace TargetMenu
 			case 1:
 				Overrides::SetNpcEnabled(act, npcExcluded ? std::optional<bool>(true) : std::optional<bool>(false));
 				Probe::ReprocessActorNow(actorId);
-				RE::SendHUDMessage::ShowHUDMessage(
-					std::format("MiniSkirt: {} -> {}", act->GetDisplayFullName(), npcExcluded ? "Enabled" : "Excluded").c_str());
+				RE::SendHUDMessage::ShowHUDMessage(std::format("MiniSkirt: {} -> {}", act->GetDisplayFullName(),
+					npcExcluded ? Tr("$MSK_MenuEnabled", "Enabled") : Tr("$MSK_MenuExcluded", "Excluded"))
+					                                   .c_str());
 				break;
 			case 2:
 				OpenLengthSubMenu(actorId, armorId, false);
@@ -355,8 +487,9 @@ namespace TargetMenu
 				if (arm) {
 					Overrides::SetOutfitEnabled(arm, armExcluded ? std::optional<bool>(true) : std::optional<bool>(false));
 					Probe::ReprocessByArmorNow(armorId);
-					RE::SendHUDMessage::ShowHUDMessage(
-						std::format("MiniSkirt: Outfit {} -> {}", arm->GetName(), armExcluded ? "Enabled" : "Excluded").c_str());
+					RE::SendHUDMessage::ShowHUDMessage(std::format("MiniSkirt: {} -> {}", arm->GetName(),
+						armExcluded ? Tr("$MSK_MenuEnabled", "Enabled") : Tr("$MSK_MenuExcluded", "Excluded"))
+						                                   .c_str());
 				}
 				break;
 			case 4:
@@ -367,7 +500,7 @@ namespace TargetMenu
 				} else {
 					Probe::ReprocessActorNow(actorId);
 				}
-				RE::SendHUDMessage::ShowHUDMessage(std::format("MiniSkirt: Cleared overrides for {}", act->GetDisplayFullName()).c_str());
+				RE::SendHUDMessage::ShowHUDMessage(Tr("$MSK_MenuCleared", "MiniSkirt: Cleared overrides").c_str());
 				break;
 			default:
 				break;
