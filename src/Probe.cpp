@@ -1255,11 +1255,93 @@ namespace Probe
 			}
 		}
 
+		// Data/MCM/Settings/MiniSkirt.ini の [General] セクションに key = val を書き込む（他セクションはそのまま保持）
+		void WriteMcmIniKey(const std::string& a_key, const std::string& a_val)
+		{
+			std::vector<std::string> lines;
+			{
+				std::ifstream in(kMcmSettings);
+				std::string   line;
+				while (std::getline(in, line)) {
+					if (!line.empty() && line.back() == '\r') {
+						line.pop_back();
+					}
+					lines.push_back(std::move(line));
+				}
+			}
+			int  genStart = -1;
+			int  genEnd = static_cast<int>(lines.size());
+			bool replaced = false;
+			for (int i = 0; i < static_cast<int>(lines.size()); ++i) {
+				const auto t = Trim(lines[i]);
+				if (!t.empty() && t.front() == '[' && t.back() == ']') {
+					if (genStart >= 0) {
+						genEnd = i;
+						break;
+					}
+					if (_stricmp(t.c_str(), "[General]") == 0) {
+						genStart = i;
+					}
+				} else if (genStart >= 0) {
+					const auto eq = t.find('=');
+					if (eq != std::string::npos && Trim(t.substr(0, eq)) == a_key) {
+						lines[i] = std::format("{} = {}", a_key, a_val);
+						replaced = true;
+						break;
+					}
+				}
+			}
+			if (!replaced) {
+				if (genStart < 0) {
+					if (!lines.empty() && !lines.back().empty()) {
+						lines.emplace_back();
+					}
+					lines.emplace_back("[General]");
+					lines.push_back(std::format("{} = {}", a_key, a_val));
+				} else {
+					lines.insert(lines.begin() + genEnd, std::format("{} = {}", a_key, a_val));
+				}
+			}
+			std::filesystem::path p(kMcmSettings);
+			if (p.has_parent_path()) {
+				std::error_code ec;
+				std::filesystem::create_directories(p.parent_path(), ec);
+			}
+			std::ofstream out(p, std::ios::binary | std::ios::trunc);
+			for (const auto& l : lines) {
+				out << l << "\r\n";
+			}
+		}
+
+		void ReapplyAllActors(bool a_wasEnabled, bool a_topChanged)
+		{
+			const auto t0 = std::chrono::steady_clock::now();
+			if (a_topChanged) {
+				Band::SetTop(g_cfg.bandTop);
+			}
+			++g_gen;
+			if (!a_wasEnabled && g_cfg.enabled) {
+				g_scanFound.clear();
+				ScanLoadedActors();
+			}
+			int loaded = 0;
+			for (const auto id : std::vector<RE::FormID>(g_seen.begin(), g_seen.end())) {
+				auto actor = RE::TESForm::LookupByID<RE::Actor>(id);
+				if (!actor || !actor->Get3D()) {
+					logger::info("設定の読み直し: {:08X} は{}ので、次に読み込まれたときに処理する", id, actor ? "3D が無い" : "見つからない");
+					continue;
+				}
+				++loaded;
+				ProcessActor(id);
+			}
+			const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count();
+			logger::info("設定の読み直し: 読み込まれている NPC {} 人を{}（{} ms）", loaded, g_cfg.enabled ? "今の設定で作り直した" : "元のロングに戻し、帯を外した", ms);
+		}
+
 		// ゲーム中に設定を変えた（MCM を閉じた）: 設定を読み直し、読み込まれている対象の NPC 全員を元から作り直す
 		void ApplySettings()
 		{
-			const auto t0 = std::chrono::steady_clock::now();
-			const Cfg  old = g_cfg;
+			const Cfg old = g_cfg;
 			LoadCfg();
 			SyncAdjustPower();
 			if (g_dbgEnabled >= 0) {
@@ -1282,27 +1364,7 @@ namespace Probe
 				return;  // メニューを閉じるたびに読むので、変わっていなければ何も書かない
 			}
 			logger::info("設定の読み直し: 値が変わった（上端 {}）", topChanged ? "も変わった" : "は同じ");
-			if (topChanged) {
-				Band::SetTop(g_cfg.bandTop);
-			}
-			++g_gen;
-			if (!old.enabled && g_cfg.enabled) {
-				// 無効のまま起動すると、NPC を処理していないので作り直す相手の記録が空。読み込み済みの女性 NPC を拾い直す
-				g_scanFound.clear();
-				ScanLoadedActors();
-			}
-			int loaded = 0;
-			for (const auto id : std::vector<RE::FormID>(g_seen.begin(), g_seen.end())) {
-				auto actor = RE::TESForm::LookupByID<RE::Actor>(id);
-				if (!actor || !actor->Get3D()) {
-					logger::info("設定の読み直し: {:08X} は{}ので、次に読み込まれたときに処理する", id, actor ? "3D が無い" : "見つからない");
-					continue;  // 読み込まれていない NPC は、次に読み込まれたときに今の設定で処理する
-				}
-				++loaded;
-				ProcessActor(id);
-			}
-			const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count();
-			logger::info("設定の読み直し: 読み込まれている NPC {} 人を{}（{} ms）", loaded, g_cfg.enabled ? "今の設定で作り直した" : "元のロングに戻し、帯を外した", ms);
+			ReapplyAllActors(old.enabled, topChanged);
 		}
 
 		// メニュー（MCM のある Journal Menu）を閉じたら設定ファイルを読み直す（MCM Helper はスクリプト無しでも値をファイルに書くので、
@@ -1468,11 +1530,12 @@ namespace Probe
 	}
 
 	int TargetHotkey() { return g_cfg.targetHotkey; }
+	bool GlobalExcludeElderly() { return g_cfg.excludeElderly; }
 	Overrides::GlobalDefaults GetGlobalDefaults(RE::Actor* a_actor)
 	{
 		Overrides::GlobalDefaults gdef;
 		gdef.enabled = g_cfg.enabled;
-		gdef.elderlyExcluded = g_cfg.excludeElderly && IsElderly(a_actor);
+		gdef.elderlyExcluded = a_actor && g_cfg.excludeElderly && IsElderly(a_actor);
 		gdef.lengthPct = g_cfg.lengthPct;
 		gdef.hemStyle = g_cfg.hemStyle;
 		gdef.hipEase = g_cfg.hipEase;
@@ -1481,6 +1544,16 @@ namespace Probe
 		gdef.skirtGap = g_cfg.skirtGap;
 		gdef.skirtGapNoBone = g_cfg.skirtGapNoBone;
 		return gdef;
+	}
+
+	void UpdateGlobalSetting(const std::string& a_key, const std::string& a_val)
+	{
+		const bool wasEnabled = g_cfg.enabled;
+		WriteMcmIniKey(a_key, a_val);
+		LoadCfg();
+		if (auto tasks = SKSE::GetTaskInterface()) {
+			tasks->AddTask([wasEnabled] { ReapplyAllActors(wasEnabled, false); });
+		}
 	}
 
 	void ReprocessActorNow(RE::FormID a_id)

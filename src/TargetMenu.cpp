@@ -20,7 +20,9 @@
 namespace Probe
 {
 	int                       TargetHotkey();
+	bool                      GlobalExcludeElderly();
 	Overrides::GlobalDefaults GetGlobalDefaults(RE::Actor* a_actor);
+	void                      UpdateGlobalSetting(const std::string& a_key, const std::string& a_val);
 	void                      ReprocessActorNow(RE::FormID a_id);
 	void                      ReprocessByArmorNow(RE::FormID a_armorId);
 }
@@ -165,7 +167,6 @@ namespace TargetMenu
 			}
 			RE::GFxValue mc;
 			if (!menu->uiMovie->GetVariable(&mc, "_root.MessageMenu") || !mc.IsDisplayObject()) {
-				// 互換フォールバック（一部 UI Mod で名前が違う場合）
 				if (!menu->uiMovie->GetVariable(&mc, "_root") || !mc.IsDisplayObject()) {
 					return;
 				}
@@ -193,7 +194,6 @@ namespace TargetMenu
 				}
 			};
 			apply();
-			// SWF の setup() 完了後にもう一度確実に適用する
 			std::thread([apply] {
 				std::this_thread::sleep_for(std::chrono::milliseconds(60));
 				apply();
@@ -341,6 +341,13 @@ namespace TargetMenu
 			return best;
 		}
 
+		enum class Scope
+		{
+			kGlobal,
+			kOutfit,
+			kNpc,
+		};
+
 		std::string SourceLabel(Overrides::Source a_src)
 		{
 			switch (a_src) {
@@ -353,43 +360,57 @@ namespace TargetMenu
 			}
 		}
 
-		std::string TargetHeader(RE::Actor* a_actor, RE::TESObjectARMO* a_armor, bool a_forNpc)
+		std::string TargetHeader(RE::Actor* a_actor, RE::TESObjectARMO* a_armor, Scope a_scope)
 		{
-			if (a_forNpc) {
+			if (a_scope == Scope::kGlobal) {
+				return Tr("$MSK_MenuGlobalTitle", "Settings for All (Global)");
+			}
+			if (a_scope == Scope::kNpc && a_actor) {
 				return std::format("{}: {}", Tr("$MSK_MenuTargetNpc", "NPC"), a_actor->GetDisplayFullName());
 			}
 			return std::format("{}: {}", Tr("$MSK_MenuTargetOutfit", "Outfit"),
 				a_armor && a_armor->GetName() && *a_armor->GetName() ? a_armor->GetName() : "(Unnamed)");
 		}
 
-		void ApplyReprocess(RE::FormID a_actorId, RE::FormID a_armorId, bool a_forNpc)
+		void ApplyReprocess(RE::FormID a_actorId, RE::FormID a_armorId, Scope a_scope)
 		{
-			if (a_forNpc) {
+			if (a_scope == Scope::kNpc && a_actorId) {
 				Probe::ReprocessActorNow(a_actorId);
-			} else if (a_armorId) {
+			} else if (a_scope == Scope::kOutfit && a_armorId) {
 				Probe::ReprocessByArmorNow(a_armorId);
 			}
 		}
 
-		void OpenLengthSubMenu(RE::FormID a_actorId, RE::FormID a_armorId, bool a_forNpc)
+		void OpenGlobalMenu(RE::FormID a_returnActorId);
+		void OpenDetailSubMenu(RE::FormID a_actorId, RE::FormID a_armorId, Scope a_scope);
+
+		void OpenLengthSubMenu(RE::FormID a_actorId, RE::FormID a_armorId, Scope a_scope)
 		{
-			auto actor = RE::TESForm::LookupByID<RE::Actor>(a_actorId);
+			auto actor = a_actorId ? RE::TESForm::LookupByID<RE::Actor>(a_actorId) : nullptr;
 			auto armor = a_armorId ? RE::TESForm::LookupByID<RE::TESObjectARMO>(a_armorId) : nullptr;
-			if (!actor) {
+			if (a_scope == Scope::kNpc && !actor) {
 				return;
 			}
-			if (!a_forNpc && !armor) {
+			if (a_scope == Scope::kOutfit && !armor) {
 				RE::SendHUDMessage::ShowHUDMessage(Tr("$MSK_MenuNoOutfit", "MiniSkirt: Target is not wearing a body outfit.").c_str());
 				return;
 			}
 
-			const auto res = Overrides::Resolve(actor, armor, Probe::GetGlobalDefaults(actor));
-			const int  curPct = std::clamp(static_cast<int>(std::lround(res.lengthPct)), 10, 100);
+			int         curPct = 30;
+			std::string srcStr = SourceLabel(Overrides::Source::kGlobal);
+			if (a_scope == Scope::kGlobal) {
+				const auto gdef = Probe::GetGlobalDefaults(nullptr);
+				curPct = std::clamp(static_cast<int>(std::lround(gdef.lengthPct)), 10, 100);
+			} else {
+				const auto res = Overrides::Resolve(actor, armor, Probe::GetGlobalDefaults(actor));
+				curPct = std::clamp(static_cast<int>(std::lround(res.lengthPct)), 10, 100);
+				srcStr = SourceLabel(res.lengthSource);
+			}
 
 			const std::string body = std::format("{}\n{}\n{}: {}% [{}]", Tr("$MSK_MenuLenTitle", "Adjust Skirt Length (10-100%)"),
-				TargetHeader(actor, armor, a_forNpc), Tr("$MSK_MenuCurrentLabel", "Current"), curPct, SourceLabel(res.lengthSource));
+				TargetHeader(actor, armor, a_scope), Tr("$MSK_MenuCurrentLabel", "Current"), curPct, srcStr);
 
-			static constexpr int kDeltas[] = { -10, -5, -1, +1, +5, +10 };
+			static constexpr int     kDeltas[] = { -10, -5, -1, +1, +5, +10 };
 			std::vector<std::string> buttons = {
 				"-10%",
 				"-5%",
@@ -398,41 +419,46 @@ namespace TargetMenu
 				"+5%",
 				"+10%",
 				Tr("$MSK_MenuBtnLen100", "100% (Original Length)"),
-				Tr("$MSK_MenuBtnResetLen", "Reset Length to Default"),
-				Tr("$MSK_MenuBtnDone", "Done"),
 			};
+			const bool hasReset = a_scope != Scope::kGlobal;
+			if (hasReset) {
+				buttons.push_back(Tr("$MSK_MenuBtnResetLen", "Reset Length to Default"));
+			}
+			buttons.push_back(Tr("$MSK_MenuBtnBack", "Back"));
 
-			ShowMenu(body, buttons, [a_actorId, a_armorId, a_forNpc, curPct](std::int32_t a_idx) {
-				auto act = RE::TESForm::LookupByID<RE::Actor>(a_actorId);
+			ShowMenu(body, buttons, [a_actorId, a_armorId, a_scope, curPct, hasReset](std::int32_t a_idx) {
+				auto act = a_actorId ? RE::TESForm::LookupByID<RE::Actor>(a_actorId) : nullptr;
 				auto arm = a_armorId ? RE::TESForm::LookupByID<RE::TESObjectARMO>(a_armorId) : nullptr;
-				if (!act) {
-					return;
-				}
+				auto applyLen = [&](std::optional<float> v) {
+					if (a_scope == Scope::kGlobal) {
+						if (v.has_value()) {
+							Probe::UpdateGlobalSetting("fSkirtLength", std::format("{:.6f}", *v));
+						}
+					} else if (a_scope == Scope::kNpc && act) {
+						Overrides::SetNpcLength(act, v);
+						ApplyReprocess(a_actorId, a_armorId, a_scope);
+					} else if (a_scope == Scope::kOutfit && arm) {
+						Overrides::SetOutfitLength(arm, v);
+						ApplyReprocess(a_actorId, a_armorId, a_scope);
+					}
+				};
+
 				if (a_idx >= 0 && a_idx < 6) {
 					const float nextPct = static_cast<float>(std::clamp(curPct + kDeltas[a_idx], 10, 100));
-					if (a_forNpc) {
-						Overrides::SetNpcLength(act, nextPct);
-					} else if (arm) {
-						Overrides::SetOutfitLength(arm, nextPct);
-					}
-					ApplyReprocess(a_actorId, a_armorId, a_forNpc);
-					OpenLengthSubMenu(a_actorId, a_armorId, a_forNpc);
+					applyLen(nextPct);
+					OpenLengthSubMenu(a_actorId, a_armorId, a_scope);
 				} else if (a_idx == 6) {
-					if (a_forNpc) {
-						Overrides::SetNpcLength(act, 100.0f);
-					} else if (arm) {
-						Overrides::SetOutfitLength(arm, 100.0f);
+					applyLen(100.0f);
+					OpenLengthSubMenu(a_actorId, a_armorId, a_scope);
+				} else if (hasReset && a_idx == 7) {
+					applyLen(std::nullopt);
+					OpenLengthSubMenu(a_actorId, a_armorId, a_scope);
+				} else {
+					if (a_scope == Scope::kGlobal) {
+						OpenGlobalMenu(a_actorId);
+					} else if (act) {
+						OpenForActor(act);
 					}
-					ApplyReprocess(a_actorId, a_armorId, a_forNpc);
-					OpenLengthSubMenu(a_actorId, a_armorId, a_forNpc);
-				} else if (a_idx == 7) {
-					if (a_forNpc) {
-						Overrides::SetNpcLength(act, std::nullopt);
-					} else if (arm) {
-						Overrides::SetOutfitLength(arm, std::nullopt);
-					}
-					ApplyReprocess(a_actorId, a_armorId, a_forNpc);
-					OpenLengthSubMenu(a_actorId, a_armorId, a_forNpc);
 				}
 			});
 		}
@@ -445,18 +471,18 @@ namespace TargetMenu
 			kSkirtGapNoBone,
 		};
 
-		void OpenDetailSubMenu(RE::FormID a_actorId, RE::FormID a_armorId, bool a_forNpc);
-
-		void OpenFloatSubMenu(RE::FormID a_actorId, RE::FormID a_armorId, bool a_forNpc, FloatField a_field)
+		void OpenFloatSubMenu(RE::FormID a_actorId, RE::FormID a_armorId, Scope a_scope, FloatField a_field)
 		{
-			auto actor = RE::TESForm::LookupByID<RE::Actor>(a_actorId);
+			auto actor = a_actorId ? RE::TESForm::LookupByID<RE::Actor>(a_actorId) : nullptr;
 			auto armor = a_armorId ? RE::TESForm::LookupByID<RE::TESObjectARMO>(a_armorId) : nullptr;
-			if (!actor || (!a_forNpc && !armor)) {
+			if ((a_scope == Scope::kNpc && !actor) || (a_scope == Scope::kOutfit && !armor)) {
 				return;
 			}
-			const auto res = Overrides::Resolve(actor, armor, Probe::GetGlobalDefaults(actor));
+			const auto gdef = Probe::GetGlobalDefaults(actor);
+			const auto res = (a_scope == Scope::kGlobal) ? Overrides::Resolve(nullptr, nullptr, gdef) : Overrides::Resolve(actor, armor, gdef);
 
 			std::string       title;
+			const char*       iniKey = "";
 			float             curVal = 0.0f;
 			float             minV = 0.0f, maxV = 8.0f, smallStep = 0.5f, bigStep = 1.0f;
 			bool              isIntDeg = false;
@@ -465,6 +491,7 @@ namespace TargetMenu
 			switch (a_field) {
 			case FloatField::kHipEase:
 				title = Tr("$MSK_HipEaseText", "Hip Ease");
+				iniKey = "fHipEase";
 				curVal = res.hipEase;
 				src = res.hipEaseSource;
 				minV = 0.0f;
@@ -474,6 +501,7 @@ namespace TargetMenu
 				break;
 			case FloatField::kFlareAngle:
 				title = Tr("$MSK_FlareText", "Flare Angle");
+				iniKey = "fFlareAngle";
 				curVal = res.flareAngle;
 				src = res.flareAngleSource;
 				minV = 0.0f;
@@ -484,6 +512,7 @@ namespace TargetMenu
 				break;
 			case FloatField::kSkirtGap:
 				title = Tr("$MSK_GapText", "Skirt / Leg Gap");
+				iniKey = "fSkirtGap";
 				curVal = res.skirtGap;
 				src = res.skirtGapSource;
 				minV = 0.0f;
@@ -493,6 +522,7 @@ namespace TargetMenu
 				break;
 			case FloatField::kSkirtGapNoBone:
 				title = Tr("$MSK_GapStiffText", "Gap (Stiff Skirts)");
+				iniKey = "fSkirtGapNoBone";
 				curVal = res.skirtGapNoBone;
 				src = res.skirtGapNoBoneSource;
 				minV = 0.0f;
@@ -504,7 +534,7 @@ namespace TargetMenu
 
 			const std::string valStr = isIntDeg ? std::format("{:.0f}°", curVal) : std::format("{:.1f}", curVal);
 			const std::string body = std::format("{} ({:.0f}-{:.0f})\n{}\n{}: {} [{}]", title, minV, maxV,
-				TargetHeader(actor, armor, a_forNpc), Tr("$MSK_MenuCurrentLabel", "Current"), valStr, SourceLabel(src));
+				TargetHeader(actor, armor, a_scope), Tr("$MSK_MenuCurrentLabel", "Current"), valStr, SourceLabel(src));
 
 			const float              deltas[4] = { -bigStep, -smallStep, +smallStep, +bigStep };
 			std::vector<std::string> buttons;
@@ -515,17 +545,23 @@ namespace TargetMenu
 					buttons.push_back(std::format("{:+.1f}", deltas[i]));
 				}
 			}
-			buttons.push_back(Tr("$MSK_MenuBtnResetItem", "Reset to Default"));
+			const bool hasReset = a_scope != Scope::kGlobal;
+			if (hasReset) {
+				buttons.push_back(Tr("$MSK_MenuBtnResetItem", "Reset to Default"));
+			}
 			buttons.push_back(Tr("$MSK_MenuBtnBack", "Back"));
 
-			ShowMenu(body, buttons, [a_actorId, a_armorId, a_forNpc, a_field, curVal, minV, maxV, smallStep, bigStep](std::int32_t a_idx) {
-				auto act = RE::TESForm::LookupByID<RE::Actor>(a_actorId);
+			ShowMenu(body, buttons, [a_actorId, a_armorId, a_scope, a_field, iniKey, curVal, minV, maxV, smallStep, bigStep, hasReset](std::int32_t a_idx) {
+				auto act = a_actorId ? RE::TESForm::LookupByID<RE::Actor>(a_actorId) : nullptr;
 				auto arm = a_armorId ? RE::TESForm::LookupByID<RE::TESObjectARMO>(a_armorId) : nullptr;
-				if (!act) {
-					return;
-				}
 				const float deltasLocal[4] = { -bigStep, -smallStep, +smallStep, +bigStep };
 				auto        setField = [&](std::optional<float> v) {
+                    if (a_scope == Scope::kGlobal) {
+                        if (v.has_value()) {
+                            Probe::UpdateGlobalSetting(iniKey, std::format("{:.6f}", *v));
+                        }
+                        return;
+                    }
                     auto fn = [&](Overrides::Rule& r) {
                         switch (a_field) {
                         case FloatField::kHipEase:
@@ -542,98 +578,139 @@ namespace TargetMenu
                             break;
                         }
                     };
-                    if (a_forNpc) {
+                    if (a_scope == Scope::kNpc && act) {
                         Overrides::UpdateNpc(act, fn);
-                    } else if (arm) {
+                    } else if (a_scope == Scope::kOutfit && arm) {
                         Overrides::UpdateOutfit(arm, fn);
                     }
-                    ApplyReprocess(a_actorId, a_armorId, a_forNpc);
+                    ApplyReprocess(a_actorId, a_armorId, a_scope);
 				};
 
 				if (a_idx >= 0 && a_idx < 4) {
 					setField(std::clamp(curVal + deltasLocal[a_idx], minV, maxV));
-					OpenFloatSubMenu(a_actorId, a_armorId, a_forNpc, a_field);
-				} else if (a_idx == 4) {
+					OpenFloatSubMenu(a_actorId, a_armorId, a_scope, a_field);
+				} else if (hasReset && a_idx == 4) {
 					setField(std::nullopt);
-					OpenFloatSubMenu(a_actorId, a_armorId, a_forNpc, a_field);
+					OpenFloatSubMenu(a_actorId, a_armorId, a_scope, a_field);
 				} else {
-					OpenDetailSubMenu(a_actorId, a_armorId, a_forNpc);
+					OpenDetailSubMenu(a_actorId, a_armorId, a_scope);
 				}
 			});
 		}
 
-		void OpenDetailSubMenu(RE::FormID a_actorId, RE::FormID a_armorId, bool a_forNpc)
+		void OpenDetailSubMenu(RE::FormID a_actorId, RE::FormID a_armorId, Scope a_scope)
 		{
-			auto actor = RE::TESForm::LookupByID<RE::Actor>(a_actorId);
+			auto actor = a_actorId ? RE::TESForm::LookupByID<RE::Actor>(a_actorId) : nullptr;
 			auto armor = a_armorId ? RE::TESForm::LookupByID<RE::TESObjectARMO>(a_armorId) : nullptr;
-			if (!actor) {
+			if (a_scope == Scope::kNpc && !actor) {
 				return;
 			}
-			if (!a_forNpc && !armor) {
+			if (a_scope == Scope::kOutfit && !armor) {
 				RE::SendHUDMessage::ShowHUDMessage(Tr("$MSK_MenuNoOutfit", "MiniSkirt: Target is not wearing a body outfit.").c_str());
 				return;
 			}
 
-			const auto res = Overrides::Resolve(actor, armor, Probe::GetGlobalDefaults(actor));
+			const auto gdef = Probe::GetGlobalDefaults(actor);
+			const auto res = (a_scope == Scope::kGlobal) ? Overrides::Resolve(nullptr, nullptr, gdef) : Overrides::Resolve(actor, armor, gdef);
 			const auto cutStr = res.hemStyle == 0 ? Tr("$MSK_CutOptRoughText", "Rough") : Tr("$MSK_CutOptLevelText", "Level");
+			const bool elderlyExcl = Probe::GlobalExcludeElderly();
 
-			const std::string body = std::format("{}\n{}", Tr("$MSK_MenuMoreTitle", "More Settings"), TargetHeader(actor, armor, a_forNpc));
+			const std::string body = std::format("{}\n{}", Tr("$MSK_MenuMoreTitle", "More Settings"), TargetHeader(actor, armor, a_scope));
 
-			std::vector<std::string> buttons = {
-				std::format("{}: {} [{}]", Tr("$MSK_CutStyleText", "Hem Cut Style"), cutStr, SourceLabel(res.hemStyleSource)),
-				std::format("{}: {:.1f} [{}]...", Tr("$MSK_HipEaseText", "Hip Ease"), res.hipEase, SourceLabel(res.hipEaseSource)),
-				std::format("{}: {:.0f}° [{}]...", Tr("$MSK_FlareText", "Flare Angle"), res.flareAngle, SourceLabel(res.flareAngleSource)),
-				std::format("[{}] {} [{}]", res.underwear ? "x" : " ", Tr("$MSK_UnderwearText", "Wear Underwear"), SourceLabel(res.underwearSource)),
-				std::format("{}: {:.1f} [{}]...", Tr("$MSK_GapText", "Skirt / Leg Gap"), res.skirtGap, SourceLabel(res.skirtGapSource)),
-				std::format("{}: {:.1f} [{}]...", Tr("$MSK_GapStiffText", "Gap (Stiff Skirts)"), res.skirtGapNoBone, SourceLabel(res.skirtGapNoBoneSource)),
-				Tr("$MSK_MenuBtnResetMore", "Reset Detail Settings"),
-				Tr("$MSK_MenuBtnBack", "Back"),
+			enum class DAct
+			{
+				kCut,
+				kHip,
+				kFlare,
+				kUnderwear,
+				kGap,
+				kGapStiff,
+				kElderly,
+				kReset,
+				kBack,
 			};
+			std::vector<std::string> buttons;
+			std::vector<DAct>        actions;
 
-			ShowMenu(body, buttons, [a_actorId, a_armorId, a_forNpc, curCut = res.hemStyle, curUw = res.underwear](std::int32_t a_idx) {
-				auto act = RE::TESForm::LookupByID<RE::Actor>(a_actorId);
-				auto arm = a_armorId ? RE::TESForm::LookupByID<RE::TESObjectARMO>(a_armorId) : nullptr;
-				if (!act) {
+			buttons.push_back(std::format("{}: {} [{}]", Tr("$MSK_CutStyleText", "Hem Cut Style"), cutStr, SourceLabel(res.hemStyleSource)));
+			actions.push_back(DAct::kCut);
+			buttons.push_back(std::format("{}: {:.1f} [{}]...", Tr("$MSK_HipEaseText", "Hip Ease"), res.hipEase, SourceLabel(res.hipEaseSource)));
+			actions.push_back(DAct::kHip);
+			buttons.push_back(std::format("{}: {:.0f}° [{}]...", Tr("$MSK_FlareText", "Flare Angle"), res.flareAngle, SourceLabel(res.flareAngleSource)));
+			actions.push_back(DAct::kFlare);
+			buttons.push_back(std::format("[{}] {} [{}]", res.underwear ? "x" : " ", Tr("$MSK_UnderwearText", "Wear Underwear"), SourceLabel(res.underwearSource)));
+			actions.push_back(DAct::kUnderwear);
+			buttons.push_back(std::format("{}: {:.1f} [{}]...", Tr("$MSK_GapText", "Skirt / Leg Gap"), res.skirtGap, SourceLabel(res.skirtGapSource)));
+			actions.push_back(DAct::kGap);
+			buttons.push_back(std::format("{}: {:.1f} [{}]...", Tr("$MSK_GapStiffText", "Gap (Stiff Skirts)"), res.skirtGapNoBone, SourceLabel(res.skirtGapNoBoneSource)));
+			actions.push_back(DAct::kGapStiff);
+
+			if (a_scope == Scope::kGlobal) {
+				buttons.push_back(std::format("[{}] {}", elderlyExcl ? "x" : " ", Tr("$MSK_ElderlyText", "Exclude Elderly Women")));
+				actions.push_back(DAct::kElderly);
+			} else {
+				buttons.push_back(Tr("$MSK_MenuBtnResetMore", "Reset Detail Settings"));
+				actions.push_back(DAct::kReset);
+			}
+			buttons.push_back(Tr("$MSK_MenuBtnBack", "Back"));
+			actions.push_back(DAct::kBack);
+
+			ShowMenu(body, buttons, [a_actorId, a_armorId, a_scope, curCut = res.hemStyle, curUw = res.underwear, elderlyExcl, actions](std::int32_t a_idx) {
+				if (a_idx < 0 || static_cast<std::size_t>(a_idx) >= actions.size()) {
 					return;
 				}
-				switch (a_idx) {
-				case 0: {
+				auto act = a_actorId ? RE::TESForm::LookupByID<RE::Actor>(a_actorId) : nullptr;
+				auto arm = a_armorId ? RE::TESForm::LookupByID<RE::TESObjectARMO>(a_armorId) : nullptr;
+				switch (actions[static_cast<std::size_t>(a_idx)]) {
+				case DAct::kCut: {
 					const int nextCut = curCut == 0 ? 1 : 0;
-					auto      fn = [nextCut](Overrides::Rule& r) { r.hemStyle = nextCut; };
-					if (a_forNpc) {
-						Overrides::UpdateNpc(act, fn);
-					} else if (arm) {
-						Overrides::UpdateOutfit(arm, fn);
+					if (a_scope == Scope::kGlobal) {
+						Probe::UpdateGlobalSetting("iHemStyle", std::to_string(nextCut));
+					} else {
+						auto fn = [nextCut](Overrides::Rule& r) { r.hemStyle = nextCut; };
+						if (a_scope == Scope::kNpc && act) {
+							Overrides::UpdateNpc(act, fn);
+						} else if (a_scope == Scope::kOutfit && arm) {
+							Overrides::UpdateOutfit(arm, fn);
+						}
+						ApplyReprocess(a_actorId, a_armorId, a_scope);
 					}
-					ApplyReprocess(a_actorId, a_armorId, a_forNpc);
-					OpenDetailSubMenu(a_actorId, a_armorId, a_forNpc);
+					OpenDetailSubMenu(a_actorId, a_armorId, a_scope);
 					break;
 				}
-				case 1:
-					OpenFloatSubMenu(a_actorId, a_armorId, a_forNpc, FloatField::kHipEase);
+				case DAct::kHip:
+					OpenFloatSubMenu(a_actorId, a_armorId, a_scope, FloatField::kHipEase);
 					break;
-				case 2:
-					OpenFloatSubMenu(a_actorId, a_armorId, a_forNpc, FloatField::kFlareAngle);
+				case DAct::kFlare:
+					OpenFloatSubMenu(a_actorId, a_armorId, a_scope, FloatField::kFlareAngle);
 					break;
-				case 3: {
+				case DAct::kUnderwear: {
 					const bool nextUw = !curUw;
-					auto       fn = [nextUw](Overrides::Rule& r) { r.underwear = nextUw; };
-					if (a_forNpc) {
-						Overrides::UpdateNpc(act, fn);
-					} else if (arm) {
-						Overrides::UpdateOutfit(arm, fn);
+					if (a_scope == Scope::kGlobal) {
+						Probe::UpdateGlobalSetting("bUnderwear", nextUw ? "1" : "0");
+					} else {
+						auto fn = [nextUw](Overrides::Rule& r) { r.underwear = nextUw; };
+						if (a_scope == Scope::kNpc && act) {
+							Overrides::UpdateNpc(act, fn);
+						} else if (a_scope == Scope::kOutfit && arm) {
+							Overrides::UpdateOutfit(arm, fn);
+						}
+						ApplyReprocess(a_actorId, a_armorId, a_scope);
 					}
-					ApplyReprocess(a_actorId, a_armorId, a_forNpc);
-					OpenDetailSubMenu(a_actorId, a_armorId, a_forNpc);
+					OpenDetailSubMenu(a_actorId, a_armorId, a_scope);
 					break;
 				}
-				case 4:
-					OpenFloatSubMenu(a_actorId, a_armorId, a_forNpc, FloatField::kSkirtGap);
+				case DAct::kGap:
+					OpenFloatSubMenu(a_actorId, a_armorId, a_scope, FloatField::kSkirtGap);
 					break;
-				case 5:
-					OpenFloatSubMenu(a_actorId, a_armorId, a_forNpc, FloatField::kSkirtGapNoBone);
+				case DAct::kGapStiff:
+					OpenFloatSubMenu(a_actorId, a_armorId, a_scope, FloatField::kSkirtGapNoBone);
 					break;
-				case 6: {
+				case DAct::kElderly:
+					Probe::UpdateGlobalSetting("bExcludeElderly", elderlyExcl ? "0" : "1");
+					OpenDetailSubMenu(a_actorId, a_armorId, a_scope);
+					break;
+				case DAct::kReset: {
 					auto fn = [](Overrides::Rule& r) {
 						r.hemStyle.reset();
 						r.hipEase.reset();
@@ -642,17 +719,77 @@ namespace TargetMenu
 						r.skirtGap.reset();
 						r.skirtGapNoBone.reset();
 					};
-					if (a_forNpc) {
+					if (a_scope == Scope::kNpc && act) {
 						Overrides::UpdateNpc(act, fn);
-					} else if (arm) {
+					} else if (a_scope == Scope::kOutfit && arm) {
 						Overrides::UpdateOutfit(arm, fn);
 					}
-					ApplyReprocess(a_actorId, a_armorId, a_forNpc);
-					OpenDetailSubMenu(a_actorId, a_armorId, a_forNpc);
+					ApplyReprocess(a_actorId, a_armorId, a_scope);
+					OpenDetailSubMenu(a_actorId, a_armorId, a_scope);
 					break;
 				}
 				default:
-					OpenForActor(act);
+					if (a_scope == Scope::kGlobal) {
+						OpenGlobalMenu(a_actorId);
+					} else if (act) {
+						OpenForActor(act);
+					}
+					break;
+				}
+			});
+		}
+
+		void OpenGlobalMenu(RE::FormID a_returnActorId)
+		{
+			const auto        gdef = Probe::GetGlobalDefaults(nullptr);
+			const std::string status = gdef.enabled ?
+			                               std::format("{} ({:.0f}%)", Tr("$MSK_MenuEnabled", "Enabled"), gdef.lengthPct) :
+			                               Tr("$MSK_MenuExcluded", "Excluded");
+			const std::string body = std::format("{}\n{}: {}", Tr("$MSK_MenuGlobalTitle", "Settings for All (Global)"),
+				Tr("$MSK_MenuCurrentLabel", "Current"), status);
+
+			enum class GAct
+			{
+				kApply,
+				kLen,
+				kMore,
+				kExit,
+			};
+			std::vector<std::string> buttons;
+			std::vector<GAct>        actions;
+
+			buttons.push_back(std::format("[{}] {}", gdef.enabled ? "x" : " ", Tr("$MSK_MenuBtnApply", "Apply MiniSkirt")));
+			actions.push_back(GAct::kApply);
+			if (gdef.enabled) {
+				buttons.push_back(std::format("    - {}", Tr("$MSK_MenuBtnSubLen", "Adjust Length...")));
+				actions.push_back(GAct::kLen);
+				buttons.push_back(std::format("    - {}", Tr("$MSK_MenuBtnSubMore", "More Settings...")));
+				actions.push_back(GAct::kMore);
+			}
+			buttons.push_back(a_returnActorId ? Tr("$MSK_MenuBtnBack", "Back") : Tr("$MSK_MenuBtnClose", "Close"));
+			actions.push_back(GAct::kExit);
+
+			ShowMenu(body, buttons, [a_returnActorId, enabled = gdef.enabled, actions](std::int32_t a_idx) {
+				if (a_idx < 0 || static_cast<std::size_t>(a_idx) >= actions.size()) {
+					return;
+				}
+				switch (actions[static_cast<std::size_t>(a_idx)]) {
+				case GAct::kApply:
+					Probe::UpdateGlobalSetting("bEnabled", enabled ? "0" : "1");
+					OpenGlobalMenu(a_returnActorId);
+					break;
+				case GAct::kLen:
+					OpenLengthSubMenu(a_returnActorId, 0, Scope::kGlobal);
+					break;
+				case GAct::kMore:
+					OpenDetailSubMenu(a_returnActorId, 0, Scope::kGlobal);
+					break;
+				default:
+					if (a_returnActorId) {
+						if (auto act = RE::TESForm::LookupByID<RE::Actor>(a_returnActorId)) {
+							OpenForActor(act);
+						}
+					}
 					break;
 				}
 			});
@@ -740,7 +877,8 @@ namespace TargetMenu
 	{
 		auto actor = FindLookedAtFemale();
 		if (!actor) {
-			RE::SendHUDMessage::ShowHUDMessage(Tr("$MSK_MenuNoTarget", "MiniSkirt: No female NPC in front of you.").c_str());
+			// 目の前に女性 NPC がいなくても、全体設定メニューをそのまま開けるようにする
+			OpenGlobalMenu(0);
 			return;
 		}
 		OpenForActor(actor);
@@ -749,26 +887,33 @@ namespace TargetMenu
 	void OpenForActor(RE::Actor* a_actor)
 	{
 		if (!IsValidFemaleTarget(a_actor)) {
-			RE::SendHUDMessage::ShowHUDMessage(Tr("$MSK_MenuNoTarget", "MiniSkirt: No female NPC in front of you.").c_str());
+			OpenGlobalMenu(0);
 			return;
 		}
 		const auto actorId = a_actor->GetFormID();
 		auto       armor = a_actor->GetWornArmor(RE::BGSBipedObjectForm::BipedObjectSlot::kBody);
 		const auto armorId = armor ? armor->GetFormID() : 0u;
 
-		const auto gdef = Probe::GetGlobalDefaults(a_actor);
+		const auto        gdef = Probe::GetGlobalDefaults(a_actor);
 		const std::string npcName = a_actor->GetDisplayFullName();
 		const std::string armName = armor && armor->GetName() && *armor->GetName() ? armor->GetName() : "(None)";
 
-		// MCM で全体が無効になっている場合は、案内だけ表示して調整項目を出さない
 		if (!gdef.enabled) {
 			const std::string body = std::format("MiniSkirt: {}\n{}: {}\n\n{}", npcName, Tr("$MSK_MenuOutfitLabel", "Outfit"), armName,
 				Tr("$MSK_MenuGlobalDisabled", "MiniSkirt is disabled in MCM. Enable it in MCM to adjust settings."));
-			ShowMenu(body, { Tr("$MSK_MenuBtnClose", "Close") }, {});
+			std::vector<std::string> buttons = {
+				Tr("$MSK_MenuBtnGlobal", "Settings for All (Global)..."),
+				Tr("$MSK_MenuBtnClose", "Close"),
+			};
+			ShowMenu(body, buttons, [actorId](std::int32_t a_idx) {
+				if (a_idx == 0) {
+					OpenGlobalMenu(actorId);
+				}
+			});
 			return;
 		}
 
-		const auto res = Overrides::Resolve(a_actor, armor, gdef);
+		const auto        res = Overrides::Resolve(a_actor, armor, gdef);
 		const std::string status = res.enabled ?
 		                               std::format("{} ({:.0f}% [{}])", Tr("$MSK_MenuEnabled", "Enabled"), res.lengthPct, SourceLabel(res.lengthSource)) :
 		                               std::format("{} ([{}])", Tr("$MSK_MenuExcluded", "Excluded"), SourceLabel(res.enabledSource));
@@ -785,14 +930,15 @@ namespace TargetMenu
 
 		enum class Act
 		{
-			kNpcOverride,
-			kNpcApply,
-			kNpcLen,
-			kNpcMore,
+			kGlobal,
 			kOutOverride,
 			kOutApply,
 			kOutLen,
 			kOutMore,
+			kNpcOverride,
+			kNpcApply,
+			kNpcLen,
+			kNpcMore,
 			kClose,
 		};
 		std::vector<std::string> buttons;
@@ -802,18 +948,10 @@ namespace TargetMenu
 		const std::string subLen = std::format("    - {}", Tr("$MSK_MenuBtnSubLen", "Adjust Length..."));
 		const std::string subMore = std::format("    - {}", Tr("$MSK_MenuBtnSubMore", "More Settings..."));
 
-		buttons.push_back(std::format("[{}] {}", npcOverride ? "x" : " ", Tr("$MSK_MenuBtnNpcOverride", "Override for this NPC")));
-		actions.push_back(Act::kNpcOverride);
-		if (npcOverride) {
-			buttons.push_back(std::format("    - [{}] {}", npcApply ? "x" : " ", applyLabel));
-			actions.push_back(Act::kNpcApply);
-			if (npcApply) {
-				buttons.push_back(subLen);
-				actions.push_back(Act::kNpcLen);
-				buttons.push_back(subMore);
-				actions.push_back(Act::kNpcMore);
-			}
-		}
+		// 広い範囲 → 狭い範囲の順（全体 → この衣装 → この NPC）
+		buttons.push_back(Tr("$MSK_MenuBtnGlobal", "Settings for All (Global)..."));
+		actions.push_back(Act::kGlobal);
+
 		if (armor) {
 			buttons.push_back(std::format("[{}] {}", armOverride ? "x" : " ", Tr("$MSK_MenuBtnOutOverride", "Override for this Outfit")));
 			actions.push_back(Act::kOutOverride);
@@ -828,6 +966,20 @@ namespace TargetMenu
 				}
 			}
 		}
+
+		buttons.push_back(std::format("[{}] {}", npcOverride ? "x" : " ", Tr("$MSK_MenuBtnNpcOverride", "Override for this NPC")));
+		actions.push_back(Act::kNpcOverride);
+		if (npcOverride) {
+			buttons.push_back(std::format("    - [{}] {}", npcApply ? "x" : " ", applyLabel));
+			actions.push_back(Act::kNpcApply);
+			if (npcApply) {
+				buttons.push_back(subLen);
+				actions.push_back(Act::kNpcLen);
+				buttons.push_back(subMore);
+				actions.push_back(Act::kNpcMore);
+			}
+		}
+
 		buttons.push_back(Tr("$MSK_MenuBtnClose", "Close"));
 		actions.push_back(Act::kClose);
 
@@ -842,25 +994,8 @@ namespace TargetMenu
 				return;
 			}
 			switch (actions[static_cast<std::size_t>(a_idx)]) {
-			case Act::kNpcOverride:
-				if (npcOverride) {
-					Overrides::ClearNpc(act);
-					Probe::ReprocessActorNow(actorId);
-				} else {
-					Overrides::SetNpcEnabled(act, curEffective);
-				}
-				OpenForActor(act);
-				break;
-			case Act::kNpcApply:
-				Overrides::SetNpcEnabled(act, !npcApply);
-				Probe::ReprocessActorNow(actorId);
-				OpenForActor(act);
-				break;
-			case Act::kNpcLen:
-				OpenLengthSubMenu(actorId, armorId, true);
-				break;
-			case Act::kNpcMore:
-				OpenDetailSubMenu(actorId, armorId, true);
+			case Act::kGlobal:
+				OpenGlobalMenu(actorId);
 				break;
 			case Act::kOutOverride:
 				if (arm) {
@@ -881,10 +1016,30 @@ namespace TargetMenu
 				OpenForActor(act);
 				break;
 			case Act::kOutLen:
-				OpenLengthSubMenu(actorId, armorId, false);
+				OpenLengthSubMenu(actorId, armorId, Scope::kOutfit);
 				break;
 			case Act::kOutMore:
-				OpenDetailSubMenu(actorId, armorId, false);
+				OpenDetailSubMenu(actorId, armorId, Scope::kOutfit);
+				break;
+			case Act::kNpcOverride:
+				if (npcOverride) {
+					Overrides::ClearNpc(act);
+					Probe::ReprocessActorNow(actorId);
+				} else {
+					Overrides::SetNpcEnabled(act, curEffective);
+				}
+				OpenForActor(act);
+				break;
+			case Act::kNpcApply:
+				Overrides::SetNpcEnabled(act, !npcApply);
+				Probe::ReprocessActorNow(actorId);
+				OpenForActor(act);
+				break;
+			case Act::kNpcLen:
+				OpenLengthSubMenu(actorId, armorId, Scope::kNpc);
+				break;
+			case Act::kNpcMore:
+				OpenDetailSubMenu(actorId, armorId, Scope::kNpc);
 				break;
 			default:
 				break;
