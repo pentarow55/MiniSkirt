@@ -41,7 +41,7 @@ namespace Probe
 			bool  excludeElderly{ false }; // 年配の女性（種族が Elder）は何もしない
 			float hipEase{ 1.0f };         // A ライン: お尻まわりのゆとり（帯の体のいちばん外からの幅）
 			float flareAngle{ 5.0f };      // A ライン: 裾の広がり角度（度。0 でまっすぐ下）
-			float flareStart{ 0.0f };      // 広がり開始位置（0..100）
+			float flareStart{ 20.0f };     // 広がり開始位置（0=ハイウエスト..20=標準ウエスト..100=太もも寄り）
 			float flareCurve{ 0.0f };      // カーブの形（-50..+50）
 			float flareBias{ 0.0f };       // 張り出す位置（-50=上寄り..+50=下寄り）
 			float bandTop{ 78.0f };      // 帯（足首から）の上端。全 NPC 共通（体 nif ごとにファイル 1 個）

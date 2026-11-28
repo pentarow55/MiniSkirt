@@ -548,7 +548,7 @@ namespace TargetMenu
 				title = Tr("$MSK_FlareStartText", "Flare start (%)");
 				iniKey = "fFlareStart";
 				curVal = res.flareStart;
-				defaultVal = 0.0f;
+				defaultVal = 20.0f;
 				src = res.flareStartSource;
 				minV = 0.0f;
 				maxV = 100.0f;
