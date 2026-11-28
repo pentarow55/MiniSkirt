@@ -942,7 +942,7 @@ namespace Skirt
 				const float r0 = (std::max)(env.Lerp(zf, tf), 1e-3f);
 
 				// 体の外形（食い込み防止の下限。帯の上端 a_top 以下だけ体基準）
-				const float bBlend = (std::clamp)((ZB + 4.0f - p.z) / 8.0f, 0.0f, 1.0f);
+				const float bBlend = (std::clamp)((ZB + 6.0f - p.z) / 6.0f, 0.0f, 1.0f);
 				const float bSmooth = bBlend * bBlend * (3.0f - 2.0f * bBlend);
 				const float bz = benvUp.Lerp(zf, tf) * (1.0f - bSmooth) + benv.Lerp(zf, tf) * bSmooth;
 				const float fade = (std::clamp)((a_top - p.z) / kRise, 0.0f, 1.0f);
@@ -966,9 +966,11 @@ namespace Skirt
 					const float u = (std::clamp)(d / span, 0.0f, 1.0f);
 
 					// 1) ウエストからの直線（赤線）と、お尻の外形から広がる線の大きい方を Curve shape = 0 の基準にする
-					//    - 広がりが小さいとき: お尻の丸みに沿って自然に落ちる（脚が突き抜けない）
+					//    - 広がりが小さいとき: お尻の丸み・元の服幅に沿って自然に落ちる（脚が突き抜けない）
 					//    - 広がりが大きいとき: ウエストからすそへの直線（余計なお尻の膨らみを足さない）
-					const float rPeak = (std::max)(rStart, RB + a_ease);
+					const float zfZB = (ZB - z0) / kDz - 0.5f;
+					const float r0AtZB = (std::max)(env.Lerp(zfZB, tf), 1e-3f);
+					const float rPeak = (std::max)({ rStart, RB + a_ease, r0AtZB });
 					float       rHip = rStart;
 					if (zStart > ZB + 1.0f) {
 						const float tHip = (std::clamp)((zStart - p.z) / (zStart - ZB), 0.0f, 1.0f);
