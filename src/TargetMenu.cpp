@@ -539,9 +539,9 @@ namespace TargetMenu
 				defaultVal = 5.0f;
 				src = res.flareAngleSource;
 				minV = 0.0f;
-				maxV = 30.0f;
-				smallStep = 1.0f;
-				bigStep = 5.0f;
+				maxV = 60.0f;
+				smallStep = 5.0f;
+				bigStep = 15.0f;
 				isInt = true;
 				break;
 			case FloatField::kFlareStart:

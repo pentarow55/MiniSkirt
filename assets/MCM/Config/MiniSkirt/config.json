@@ -109,7 +109,7 @@
       "type": "slider",
       "valueOptions": {
         "min": 0,
-        "max": 30,
+        "max": 60,
         "step": 1,
         "formatString": "{0}",
         "sourceType": "ModSettingFloat"

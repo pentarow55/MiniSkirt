@@ -13,7 +13,7 @@ namespace Overrides
 		std::optional<float> lengthPct;       // 10..100
 		std::optional<int>   hemStyle;        // 0=ラフ, 1=水平
 		std::optional<float> hipEase;         // 0..8
-		std::optional<float> flareAngle;      // 0..30
+		std::optional<float> flareAngle;      // 0..60
 		std::optional<float> flareStart;      // 0..100 (広がり開始位置)
 		std::optional<float> flareCurve;      // -50..+50 (カーブの形)
 		std::optional<float> flareBias;       // -50..+50 (張り出す位置: -上寄り/+下寄り)

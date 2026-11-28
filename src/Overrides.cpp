@@ -37,7 +37,7 @@ namespace Overrides
 				a_r.hipEase = Round1(std::clamp(*a_r.hipEase, 0.0f, 8.0f));
 			}
 			if (a_r.flareAngle.has_value()) {
-				a_r.flareAngle = Round1(std::clamp(*a_r.flareAngle, 0.0f, 30.0f));
+				a_r.flareAngle = Round1(std::clamp(*a_r.flareAngle, 0.0f, 60.0f));
 			}
 			if (a_r.flareStart.has_value()) {
 				a_r.flareStart = Round1(std::clamp(*a_r.flareStart, 0.0f, 100.0f));
@@ -327,7 +327,7 @@ namespace Overrides
 		out.lengthPct = std::clamp(a_global.lengthPct, kMinLength, kMaxLength);
 		out.hemStyle = std::clamp(a_global.hemStyle, 0, 1);
 		out.hipEase = std::clamp(a_global.hipEase, 0.0f, 8.0f);
-		out.flareAngle = std::clamp(a_global.flareAngle, 0.0f, 30.0f);
+		out.flareAngle = std::clamp(a_global.flareAngle, 0.0f, 60.0f);
 		out.flareStart = std::clamp(a_global.flareStart, 0.0f, 100.0f);
 		out.flareCurve = std::clamp(a_global.flareCurve, -50.0f, 50.0f);
 		out.flareBias = std::clamp(a_global.flareBias, -50.0f, 50.0f);

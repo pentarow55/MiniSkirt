@@ -135,7 +135,7 @@ namespace Probe
 				} else if (key == "hip_ease") {
 					g_cfg.hipEase = (std::max)(0.0f, F(val));
 				} else if (key == "flare_angle") {
-					g_cfg.flareAngle = (std::clamp)(F(val), 0.0f, 30.0f);
+					g_cfg.flareAngle = (std::clamp)(F(val), 0.0f, 60.0f);
 				} else if (key == "flare_start") {
 					g_cfg.flareStart = (std::clamp)(F(val), 0.0f, 100.0f);
 				} else if (key == "flare_curve") {
@@ -179,7 +179,7 @@ namespace Probe
 				} else if (key == "fHipEase") {
 					g_cfg.hipEase = (std::max)(0.0f, F(val));
 				} else if (key == "fFlareAngle") {
-					g_cfg.flareAngle = (std::clamp)(F(val), 0.0f, 30.0f);
+					g_cfg.flareAngle = (std::clamp)(F(val), 0.0f, 60.0f);
 				} else if (key == "fFlareStart") {
 					g_cfg.flareStart = (std::clamp)(F(val), 0.0f, 100.0f);
 				} else if (key == "fFlareCurve") {

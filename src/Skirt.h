@@ -901,10 +901,11 @@ namespace Skirt
 		// お尻の線より上は、となりとの最大を取らない体の外形で見る。取ると、お尻の上のくびれ（頂点がまばら）で横・下のお尻の山を拾い、
 		// 体を 2 近く大きく見積もって、スカートがお尻から腰まで出っ張った（イソルダの農民の服 04。お尻が大きく見えた）。足りない分は押し出しが補う
 		const Grid  benvUp = Envelope(band, cx, cy, z0, nz, false, true);
-		// 丈に依存しない傾き（型紙）をベースに、開始点とすその幅を固定したまま途中のカーブ（＋外丸み / 0直線 / −内反り）だけを変える。
-		// a_angle: 広がり（0..30）、a_flareStart: 開始位置（0=ハイウエスト..20=標準ウエスト..100=太もも寄り）、
-		// a_flareCurve: カーブの形（+50=外に丸い / 0=純粋な直線 / -50=内に反る）、a_flareBias: カーブの山/谷の位置（-50=上寄り..+50=下寄り）
-		const float     flareAmt = (std::clamp)(a_angle, 0.0f, 30.0f);
+		// 丈に依存しない傾き（型紙）をベースに、お尻の丸い体の外形＋直線フレアを Curve shape = 0 の基準にする。
+		// 開始点とすその幅を固定したまま途中のカーブ（＋外丸み / 0お尻基準の直線フレア / −内反りで丸みを打ち消す）だけを変える。
+		// a_angle: 広がり角度（0..60°）、a_flareStart: 開始位置（0=ハイウエスト..20=標準ウエスト..100=太もも寄り）、
+		// a_flareCurve: カーブの形（+50=外に丸い / 0=お尻外形＋直線フレア / -50=内に反る）、a_flareBias: カーブの山/谷の位置（-50=上寄り..+50=下寄り）
+		const float     flareAmt = (std::clamp)(a_angle, 0.0f, 60.0f);
 		const float     startFrac = (std::clamp)(a_flareStart, 0.0f, 100.0f) / 100.0f;
 		const float     curveNorm = (std::clamp)(a_flareCurve, -50.0f, 50.0f) / 50.0f;
 		const float     biasNorm = (std::clamp)(a_flareBias, -50.0f, 50.0f) / 50.0f;
@@ -912,7 +913,8 @@ namespace Skirt
 		constexpr float kRefSpan = 40.0f;  // 丈に依存しない固定の基準長さ
 		const float     zUpper = a_top + 10.0f;
 		const float     zStart = zUpper - startFrac * kRefSpan;
-		const float     slope = (flareAmt * 0.55f) / kRefSpan;  // 丈を変えても一定の広がり傾き
+		const float     hemZ = a_expandOnly ? zmin : a_hem;  // 丈 100% のときは元のすそ位置まで広げる
+		const float     slope = std::tan(flareAmt * kPi / 180.0f);  // 丈を変えても一定の広がり傾き
 		auto            smoothMax = [](float a, float b, float k) {
             const float h = (std::max)(k - std::fabs(a - b), 0.0f) / k;
             return (std::max)(a, b) + h * h * k * 0.25f;
@@ -935,6 +937,7 @@ namespace Skirt
 				const float fl = std::floor(tf);
 				const int   t0 = ((static_cast<int>(fl) % kNth) + kNth) % kNth, t1 = (t0 + 1) % kNth;
 				const float ft = tf - fl;
+				const float RB = rb[t0] * (1 - ft) + rb[t1] * ft;
 				const float ZB = zb[t0] * (1 - ft) + zb[t1] * ft;
 				const float r0 = (std::max)(env.Lerp(zf, tf), 1e-3f);
 
@@ -947,9 +950,7 @@ namespace Skirt
 				const float rBody = p.z < a_top ? (bz + a_ease * fadeS) : r0;
 
 				float rt;
-				if (a_expandOnly) {
-					rt = rBody;
-				} else if (p.z >= zStart) {
+				if (p.z >= zStart) {
 					// 開始位置より上は元の服の幅（体より内側なら rBody）
 					rt = p.z < a_top ? smoothMax(r0, rBody, 1.0f) : r0;
 				} else {
@@ -959,31 +960,40 @@ namespace Skirt
 					const float rBodyStart = zStart < a_top ? (benvUp.Lerp(zfStart, tf) + a_ease) : r0Start;
 					const float rStart = (std::max)(r0Start, rBodyStart);
 
-					// 開始位置から現在のすそ a_hem までのスパン（すそ幅は slope で決まるため Curve shape で変わらない）
-					const float span = (std::max)(zStart - a_hem, 1.0f);
+					// 開始位置から現在のすそ hemZ までのスパン（すそ幅は slope で決まるため Curve shape で変わらない）
+					const float span = (std::max)(zStart - hemZ, 1.0f);
 					const float d = zStart - p.z;
 					const float u = (std::clamp)(d / span, 0.0f, 1.0f);
 
-					// 1) 純粋な直線（Curve shape = 0 のとき。丈を変えても傾き slope は一定）
-					const float rLine = rStart + slope * d;
+					// 1) お尻の丸い体の外形ベース（zStart からお尻の山 ZB まで滑らかに張り出し、その下は山幅を保つ）＋直線フレア
+					const float rPeak = (std::max)(rStart, RB + a_ease);
+					float       rHip = rPeak;
+					if (zStart > ZB + 1.0f) {
+						const float tHip = (std::clamp)((zStart - p.z) / (zStart - ZB), 0.0f, 1.0f);
+						const float sHip = tHip * tHip * (3.0f - 2.0f * tHip);
+						rHip = rStart + (rPeak - rStart) * sHip;
+					} else {
+						rHip = rStart;
+					}
+					if (p.z < a_top) {
+						rHip = (std::max)(rHip, rBody);
+					}
+					const float rZero = rHip + slope * d;
 
-					// 2) カーブ成分（u=0 と u=1 で厳密に 0 なので、開始点もすその幅も 1 ミリも変わらない）
+					// 2) カーブ成分（u=0 と u=1 で厳密に 0 なので、開始点もすその幅も変わらない）
 					const float uBias = u > 1e-5f ? std::pow(u, biasExp) : 0.0f;
 					const float sPi = std::sin(kPi * uBias);
 					const float bulge = sPi * sPi;
-					const float maxBulge = (std::min)(span * 0.28f, 7.5f);
-					const float raw = rLine + curveNorm * maxBulge * bulge;
+					const float maxBulge = (std::min)(span * 0.30f, 10.0f);
+					const float raw = rZero + curveNorm * maxBulge * bulge;
 
-					rt = p.z < a_top ? smoothMax(raw, rBody, 1.0f) : (std::max)(raw, r0);
+					rt = p.z < a_top ? smoothMax(raw, rBody, 0.8f) : (std::max)(raw, r0);
 				}
 				// a_keepLayers（鎧）: 重なった板の間隔を保つ。外側（r0）の移動量 rt−r0 を、同じ方位・高さの全頂点へ同じだけ足す。
 				// 比で縮尺して体の外形でそろえると、内側の板が全部同じ半径に潰れて、前後が入れ替わる（背中に穴が空く）
 				// 縮めない（広げるほうだけ）: 鎧は目標（お尻の線＋ゆとり）より元から緩い。縮めると丸いお尻が板を突き破る
 				float rn = a_keepLayers ? (std::max)(r + (std::max)(rt - r0, 0.0f), 1.0f) :
 				                          (p.z < a_top ? (std::max)(r * rt / r0, bz + 0.5f * a_ease * fadeS) : (std::max)(r * rt / r0, r));
-				if (a_expandOnly) {
-					rn = (std::max)(r * (std::max)(rt / r0, 1.0f), r);  // 広げるだけ（外側が足りない分の比で、重なった布もそろって出る）
-				}
 				float       f = rn / r;
 				f = 1.0f + (f - 1.0f) * (std::clamp)(1.0f - aw, 0.0f, 1.0f);
 				if (std::fabs(f - 1.0f) > 1e-4f) {
