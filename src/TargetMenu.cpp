@@ -150,12 +150,52 @@ namespace TargetMenu
 			return a_fallback;
 		}
 
-		// ---- ネイティブ選択肢メッセージボックス（MiniSkirt のメニューだけ左寄せ表示） ----
+		// ---- ネイティブ選択肢メッセージボックス（MiniSkirt のメニューだけ左寄せ表示＋選択位置維持） ----
 		constexpr double  kMenuShiftLeft = 360.0;
 		std::atomic<bool> g_ourMenuActive{ false };
+		std::atomic<int>  g_initialFocus{ 0 };
 		double            g_origMenuX = -99999.0;
 
-		void ApplyMenuOffset(bool a_left)
+		void ApplyMenuFocus(RE::GFxMovieView* a_movie, int a_idx)
+		{
+			if (!a_movie || a_idx <= 0) {
+				return;
+			}
+			// バニラ MessageBoxMenu.swf: _root.MessageMenu.Buttons[idx].onRollOver() で選択カーソルを移動
+			RE::GFxValue btns;
+			if (a_movie->GetVariable(&btns, "_root.MessageMenu.Buttons") && btns.IsArray()) {
+				if (static_cast<std::uint32_t>(a_idx) < btns.GetArraySize()) {
+					RE::GFxValue btn;
+					if (btns.GetElement(static_cast<std::uint32_t>(a_idx), &btn) && btn.IsObject()) {
+						btn.Invoke("onRollOver", nullptr, nullptr, 0);
+						return;
+					}
+				}
+			}
+			// フォールバック: Button_0 / Button0 系の命名やメンバ確認用ログ（初回のみ）
+			static bool s_logged = false;
+			if (!s_logged) {
+				s_logged = true;
+				RE::GFxValue mc;
+				if (a_movie->GetVariable(&mc, "_root.MessageMenu") && mc.IsObject()) {
+					struct Visitor : RE::GFxValue::ObjectVisitor
+					{
+						std::string names;
+						void        Visit(const char* a_name, const RE::GFxValue&) override
+						{
+							if (a_name) {
+								if (!names.empty()) names += ", ";
+								names += a_name;
+							}
+						}
+					} vis;
+					mc.VisitMembers(&vis);
+					logger::info("TargetMenu: _root.MessageMenu members: {}", vis.names);
+				}
+			}
+		}
+
+		void ApplyMenuOffset(bool a_left, int a_focusIdx = 0)
 		{
 			auto ui = RE::UI::GetSingleton();
 			if (!ui) {
@@ -184,13 +224,16 @@ namespace TargetMenu
 				info.SetX(targetX);
 				mc.SetDisplayInfo(info);
 			}
+			if (a_left && a_focusIdx > 0) {
+				ApplyMenuFocus(menu->uiMovie.get(), a_focusIdx);
+			}
 		}
 
-		void ScheduleApplyOffset(bool a_left)
+		void ScheduleApplyOffset(bool a_left, int a_focusIdx = 0)
 		{
-			auto apply = [a_left] {
+			auto apply = [a_left, a_focusIdx] {
 				if (auto tasks = SKSE::GetTaskInterface()) {
-					tasks->AddUITask([a_left] { ApplyMenuOffset(a_left); });
+					tasks->AddUITask([a_left, a_focusIdx] { ApplyMenuOffset(a_left, a_focusIdx); });
 				}
 			};
 			apply();
@@ -210,10 +253,12 @@ namespace TargetMenu
 				}
 				if (a_event->opening) {
 					const bool ours = g_ourMenuActive.load();
-					ScheduleApplyOffset(ours);
+					const int  focus = ours ? g_initialFocus.load() : 0;
+					ScheduleApplyOffset(ours, focus);
 				} else {
 					g_ourMenuActive.store(false);
-					ApplyMenuOffset(false);
+					g_initialFocus.store(0);
+					ApplyMenuOffset(false, 0);
 				}
 				return RE::BSEventNotifyControl::kContinue;
 			}
@@ -235,13 +280,13 @@ namespace TargetMenu
 			std::function<void(std::int32_t)> _fn;
 		};
 
-		void ShowMenu(const std::string& a_body, const std::vector<std::string>& a_buttons, std::function<void(std::int32_t)> a_onSelect)
+		void ShowMenu(const std::string& a_body, const std::vector<std::string>& a_buttons, std::function<void(std::int32_t)> a_onSelect, int a_focusIdx = 0)
 		{
 			auto tasks = SKSE::GetTaskInterface();
 			if (!tasks) {
 				return;
 			}
-			tasks->AddUITask([a_body, a_buttons, a_onSelect = std::move(a_onSelect)]() mutable {
+			tasks->AddUITask([a_body, a_buttons, a_onSelect = std::move(a_onSelect), a_focusIdx]() mutable {
 				auto factory = RE::MessageDataFactoryManager::GetSingleton();
 				auto uiStr = RE::InterfaceStrings::GetSingleton();
 				if (!factory || !uiStr) {
@@ -266,8 +311,9 @@ namespace TargetMenu
 				msg->cancelButtonIndex = static_cast<std::int32_t>(a_buttons.size()) - 1;
 				msg->callback = RE::make_smart<Callback>(std::move(a_onSelect));
 				g_ourMenuActive.store(true);
+				g_initialFocus.store(a_focusIdx);
 				RE::MessageBoxMenu::QueueMessage(msg);
-				ScheduleApplyOffset(true);
+				ScheduleApplyOffset(true, a_focusIdx);
 			});
 		}
 
@@ -385,7 +431,7 @@ namespace TargetMenu
 		void OpenFlareSubMenu(RE::FormID a_actorId, RE::FormID a_armorId, Scope a_scope);
 		void OpenDetailSubMenu(RE::FormID a_actorId, RE::FormID a_armorId, Scope a_scope);
 
-		void OpenLengthSubMenu(RE::FormID a_actorId, RE::FormID a_armorId, Scope a_scope)
+		void OpenLengthSubMenu(RE::FormID a_actorId, RE::FormID a_armorId, Scope a_scope, int a_focusIdx = 0)
 		{
 			auto actor = a_actorId ? RE::TESForm::LookupByID<RE::Actor>(a_actorId) : nullptr;
 			auto armor = a_armorId ? RE::TESForm::LookupByID<RE::TESObjectARMO>(a_armorId) : nullptr;
@@ -408,7 +454,7 @@ namespace TargetMenu
 				srcStr = SourceLabel(res.lengthSource);
 			}
 
-			const std::string body = std::format("{}\n{}\n{}: {}% [{}]", Tr("$MSK_MenuLenTitle", "Adjust Skirt Length (10-100%)"),
+			const std::string body = std::format("{}\n{}\n{}: {}% ({})", Tr("$MSK_MenuLenTitle", "Adjust Skirt Length (10-100%)"),
 				TargetHeader(actor, armor, a_scope), Tr("$MSK_MenuCurrentLabel", "Current"), curPct, srcStr);
 
 			static constexpr int     kDeltas[] = { -10, -5, -1, +1, +5, +10 };
@@ -420,48 +466,47 @@ namespace TargetMenu
 				"+5%",
 				"+10%",
 				Tr("$MSK_MenuBtnLen100", "100% (Original Length)"),
+				Tr("$MSK_MenuBtnResetItem", "Reset to Default"),
+				Tr("$MSK_MenuBtnBack", "Back"),
 			};
-			const bool hasReset = a_scope != Scope::kGlobal;
-			if (hasReset) {
-				buttons.push_back(Tr("$MSK_MenuBtnResetLen", "Reset Length to Default"));
-			}
-			buttons.push_back(Tr("$MSK_MenuBtnBack", "Back"));
 
-			ShowMenu(body, buttons, [a_actorId, a_armorId, a_scope, curPct, hasReset](std::int32_t a_idx) {
-				auto act = a_actorId ? RE::TESForm::LookupByID<RE::Actor>(a_actorId) : nullptr;
-				auto arm = a_armorId ? RE::TESForm::LookupByID<RE::TESObjectARMO>(a_armorId) : nullptr;
-				auto applyLen = [&](std::optional<float> v) {
-					if (a_scope == Scope::kGlobal) {
-						if (v.has_value()) {
-							Probe::UpdateGlobalSetting("fSkirtLength", std::format("{:.6f}", *v));
+			ShowMenu(
+				body, buttons,
+				[a_actorId, a_armorId, a_scope, curPct](std::int32_t a_idx) {
+					auto act = a_actorId ? RE::TESForm::LookupByID<RE::Actor>(a_actorId) : nullptr;
+					auto arm = a_armorId ? RE::TESForm::LookupByID<RE::TESObjectARMO>(a_armorId) : nullptr;
+					auto applyLen = [&](std::optional<float> v) {
+						if (a_scope == Scope::kGlobal) {
+							const float gval = v.value_or(30.0f);
+							Probe::UpdateGlobalSetting("fSkirtLength", std::format("{:.6f}", gval));
+						} else if (a_scope == Scope::kNpc && act) {
+							Overrides::SetNpcLength(act, v);
+							ApplyReprocess(a_actorId, a_armorId, a_scope);
+						} else if (a_scope == Scope::kOutfit && arm) {
+							Overrides::SetOutfitLength(arm, v);
+							ApplyReprocess(a_actorId, a_armorId, a_scope);
 						}
-					} else if (a_scope == Scope::kNpc && act) {
-						Overrides::SetNpcLength(act, v);
-						ApplyReprocess(a_actorId, a_armorId, a_scope);
-					} else if (a_scope == Scope::kOutfit && arm) {
-						Overrides::SetOutfitLength(arm, v);
-						ApplyReprocess(a_actorId, a_armorId, a_scope);
-					}
-				};
+					};
 
-				if (a_idx >= 0 && a_idx < 6) {
-					const int nextPct = std::clamp(curPct + kDeltas[a_idx], 10, 100);
-					if (nextPct != curPct) {
-						applyLen(static_cast<float>(nextPct));
+					if (a_idx >= 0 && a_idx < 6) {
+						const int nextPct = std::clamp(curPct + kDeltas[a_idx], 10, 100);
+						if (nextPct != curPct) {
+							applyLen(static_cast<float>(nextPct));
+						}
+						OpenLengthSubMenu(a_actorId, a_armorId, a_scope, a_idx);
+					} else if (a_idx == 6) {
+						if (curPct != 100) {
+							applyLen(100.0f);
+						}
+						OpenLengthSubMenu(a_actorId, a_armorId, a_scope, a_idx);
+					} else if (a_idx == 7) {
+						applyLen(std::nullopt);
+						OpenLengthSubMenu(a_actorId, a_armorId, a_scope, a_idx);
+					} else {
+						OpenFlareSubMenu(a_actorId, a_armorId, a_scope);
 					}
-					OpenLengthSubMenu(a_actorId, a_armorId, a_scope);
-				} else if (a_idx == 6) {
-					if (curPct != 100) {
-						applyLen(100.0f);
-					}
-					OpenLengthSubMenu(a_actorId, a_armorId, a_scope);
-				} else if (hasReset && a_idx == 7) {
-					applyLen(std::nullopt);
-					OpenLengthSubMenu(a_actorId, a_armorId, a_scope);
-				} else {
-					OpenFlareSubMenu(a_actorId, a_armorId, a_scope);
-				}
-			});
+				},
+				a_focusIdx);
 		}
 
 		enum class FloatField
@@ -474,7 +519,7 @@ namespace TargetMenu
 			kSkirtGapNoBone,
 		};
 
-		void OpenFloatSubMenu(RE::FormID a_actorId, RE::FormID a_armorId, Scope a_scope, FloatField a_field)
+		void OpenFloatSubMenu(RE::FormID a_actorId, RE::FormID a_armorId, Scope a_scope, FloatField a_field, int a_focusIdx = 0)
 		{
 			auto actor = a_actorId ? RE::TESForm::LookupByID<RE::Actor>(a_actorId) : nullptr;
 			auto armor = a_armorId ? RE::TESForm::LookupByID<RE::TESObjectARMO>(a_armorId) : nullptr;
@@ -487,6 +532,7 @@ namespace TargetMenu
 			std::string       title;
 			const char*       iniKey = "";
 			float             curVal = 0.0f;
+			float             defaultVal = 0.0f;
 			float             minV = 0.0f, maxV = 8.0f, smallStep = 0.5f, bigStep = 1.0f;
 			const char*       unit = "";
 			bool              isInt = false;
@@ -497,6 +543,7 @@ namespace TargetMenu
 				title = Tr("$MSK_HipEaseText", "Hip Ease");
 				iniKey = "fHipEase";
 				curVal = res.hipEase;
+				defaultVal = 1.0f;
 				src = res.hipEaseSource;
 				minV = 0.0f;
 				maxV = 8.0f;
@@ -507,6 +554,7 @@ namespace TargetMenu
 				title = Tr("$MSK_FlareText", "Hem width");
 				iniKey = "fFlareAngle";
 				curVal = res.flareAngle;
+				defaultVal = 3.0f;
 				src = res.flareAngleSource;
 				minV = 0.0f;
 				maxV = 20.0f;
@@ -517,6 +565,7 @@ namespace TargetMenu
 				title = Tr("$MSK_FlareStartText", "Curve bias");
 				iniKey = "fFlareStart";
 				curVal = res.flareStart;
+				defaultVal = 0.0f;
 				src = res.flareStartSource;
 				minV = -50.0f;
 				maxV = 50.0f;
@@ -528,6 +577,7 @@ namespace TargetMenu
 				title = Tr("$MSK_FlareCurveText", "Mid fullness");
 				iniKey = "fFlareCurve";
 				curVal = res.flareCurve;
+				defaultVal = 0.0f;
 				src = res.flareCurveSource;
 				minV = -10.0f;
 				maxV = 15.0f;
@@ -538,6 +588,7 @@ namespace TargetMenu
 				title = Tr("$MSK_GapText", "Skirt / Leg Gap");
 				iniKey = "fSkirtGap";
 				curVal = res.skirtGap;
+				defaultVal = 1.0f;
 				src = res.skirtGapSource;
 				minV = 0.0f;
 				maxV = 8.0f;
@@ -548,6 +599,7 @@ namespace TargetMenu
 				title = Tr("$MSK_GapStiffText", "Gap (Stiff Skirts)");
 				iniKey = "fSkirtGapNoBone";
 				curVal = res.skirtGapNoBone;
+				defaultVal = 1.0f;
 				src = res.skirtGapNoBoneSource;
 				minV = 0.0f;
 				maxV = 10.0f;
@@ -569,71 +621,70 @@ namespace TargetMenu
 					buttons.push_back(std::format("{:+.1f}{}", deltas[i], unit));
 				}
 			}
-			const bool hasReset = a_scope != Scope::kGlobal;
-			if (hasReset) {
-				buttons.push_back(Tr("$MSK_MenuBtnResetItem", "Reset to Default"));
-			}
+			buttons.push_back(Tr("$MSK_MenuBtnResetItem", "Reset to Default"));
 			buttons.push_back(Tr("$MSK_MenuBtnBack", "Back"));
 
-			ShowMenu(body, buttons, [a_actorId, a_armorId, a_scope, a_field, iniKey, curVal, minV, maxV, smallStep, bigStep, hasReset](std::int32_t a_idx) {
-				auto act = a_actorId ? RE::TESForm::LookupByID<RE::Actor>(a_actorId) : nullptr;
-				auto arm = a_armorId ? RE::TESForm::LookupByID<RE::TESObjectARMO>(a_armorId) : nullptr;
-				const float deltasLocal[4] = { -bigStep, -smallStep, +smallStep, +bigStep };
-				auto        setField = [&](std::optional<float> v) {
-                    if (a_scope == Scope::kGlobal) {
-                        if (v.has_value()) {
-                            Probe::UpdateGlobalSetting(iniKey, std::format("{:.6f}", *v));
+			ShowMenu(
+				body, buttons,
+				[a_actorId, a_armorId, a_scope, a_field, iniKey, curVal, defaultVal, minV, maxV, smallStep, bigStep](std::int32_t a_idx) {
+					auto act = a_actorId ? RE::TESForm::LookupByID<RE::Actor>(a_actorId) : nullptr;
+					auto arm = a_armorId ? RE::TESForm::LookupByID<RE::TESObjectARMO>(a_armorId) : nullptr;
+					const float deltasLocal[4] = { -bigStep, -smallStep, +smallStep, +bigStep };
+					auto        setField = [&](std::optional<float> v) {
+                        if (a_scope == Scope::kGlobal) {
+                            const float gval = v.value_or(defaultVal);
+                            Probe::UpdateGlobalSetting(iniKey, std::format("{:.6f}", gval));
+                            return;
                         }
-                        return;
-                    }
-                    auto fn = [&](Overrides::Rule& r) {
-                        switch (a_field) {
-                        case FloatField::kHipEase:
-                            r.hipEase = v;
-                            break;
-                        case FloatField::kFlareAngle:
-                            r.flareAngle = v;
-                            break;
-                        case FloatField::kFlareStart:
-                            r.flareStart = v;
-                            break;
-                        case FloatField::kFlareCurve:
-                            r.flareCurve = v;
-                            break;
-                        case FloatField::kSkirtGap:
-                            r.skirtGap = v;
-                            break;
-                        case FloatField::kSkirtGapNoBone:
-                            r.skirtGapNoBone = v;
-                            break;
+                        auto fn = [&](Overrides::Rule& r) {
+                            switch (a_field) {
+                            case FloatField::kHipEase:
+                                r.hipEase = v;
+                                break;
+                            case FloatField::kFlareAngle:
+                                r.flareAngle = v;
+                                break;
+                            case FloatField::kFlareStart:
+                                r.flareStart = v;
+                                break;
+                            case FloatField::kFlareCurve:
+                                r.flareCurve = v;
+                                break;
+                            case FloatField::kSkirtGap:
+                                r.skirtGap = v;
+                                break;
+                            case FloatField::kSkirtGapNoBone:
+                                r.skirtGapNoBone = v;
+                                break;
+                            }
+                        };
+                        if (a_scope == Scope::kNpc && act) {
+                            Overrides::UpdateNpc(act, fn);
+                        } else if (a_scope == Scope::kOutfit && arm) {
+                            Overrides::UpdateOutfit(arm, fn);
                         }
-                    };
-                    if (a_scope == Scope::kNpc && act) {
-                        Overrides::UpdateNpc(act, fn);
-                    } else if (a_scope == Scope::kOutfit && arm) {
-                        Overrides::UpdateOutfit(arm, fn);
-                    }
-                    ApplyReprocess(a_actorId, a_armorId, a_scope);
-				};
+                        ApplyReprocess(a_actorId, a_armorId, a_scope);
+					};
 
-				if (a_idx >= 0 && a_idx < 4) {
-					const float nextVal = std::clamp(curVal + deltasLocal[a_idx], minV, maxV);
-					if (std::fabs(nextVal - curVal) > 1e-4f) {
-						setField(nextVal);
-					}
-					OpenFloatSubMenu(a_actorId, a_armorId, a_scope, a_field);
-				} else if (hasReset && a_idx == 4) {
-					setField(std::nullopt);
-					OpenFloatSubMenu(a_actorId, a_armorId, a_scope, a_field);
-				} else {
-					if (a_field == FloatField::kHipEase || a_field == FloatField::kFlareAngle || a_field == FloatField::kFlareStart ||
-					    a_field == FloatField::kFlareCurve) {
-						OpenFlareSubMenu(a_actorId, a_armorId, a_scope);
+					if (a_idx >= 0 && a_idx < 4) {
+						const float nextVal = std::clamp(curVal + deltasLocal[a_idx], minV, maxV);
+						if (std::fabs(nextVal - curVal) > 1e-4f) {
+							setField(nextVal);
+						}
+						OpenFloatSubMenu(a_actorId, a_armorId, a_scope, a_field, a_idx);
+					} else if (a_idx == 4) {
+						setField(std::nullopt);
+						OpenFloatSubMenu(a_actorId, a_armorId, a_scope, a_field, a_idx);
 					} else {
-						OpenDetailSubMenu(a_actorId, a_armorId, a_scope);
+						if (a_field == FloatField::kHipEase || a_field == FloatField::kFlareAngle || a_field == FloatField::kFlareStart ||
+						    a_field == FloatField::kFlareCurve) {
+							OpenFlareSubMenu(a_actorId, a_armorId, a_scope);
+						} else {
+							OpenDetailSubMenu(a_actorId, a_armorId, a_scope);
+						}
 					}
-				}
-			});
+				},
+				a_focusIdx);
 		}
 
 		void OpenFlareSubMenu(RE::FormID a_actorId, RE::FormID a_armorId, Scope a_scope)
