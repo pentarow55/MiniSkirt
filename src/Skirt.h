@@ -819,7 +819,7 @@ namespace Skirt
 	//  差し替えた脚（帯の体）の腰が、服に付いていた体より張っていると、元の布から出るため（フルダの服で腰の横に素肌が出た）
 	inline int ALine(std::vector<std::vector<Vec3>>& a_shapes, const std::vector<std::vector<float>>& a_sleeve, const std::vector<Vec3>& a_band, float a_waist,
 		float a_hem, float a_ease, float a_angle, float a_top, std::string& a_log, bool a_keepLayers = false, bool a_expandOnly = false,
-		float a_flareStart = 0.0f, float a_flareCurve = 0.0f)
+		float a_flareStart = 0.0f, float a_flareCurve = 0.0f, float a_flareBias = 0.0f)
 	{
 		using namespace ALineDetail;
 		constexpr float   kRise = 8.0f;
@@ -901,14 +901,16 @@ namespace Skirt
 		// お尻の線より上は、となりとの最大を取らない体の外形で見る。取ると、お尻の上のくびれ（頂点がまばら）で横・下のお尻の山を拾い、
 		// 体を 2 近く大きく見積もって、スカートがお尻から腰まで出っ張った（イソルダの農民の服 04。お尻が大きく見えた）。足りない分は押し出しが補う
 		const Grid  benvUp = Envelope(band, cx, cy, z0, nz, false, true);
-		// 1 本の滑らかな曲線でウエスト（t=0）〜現在のすそ（t=1）を形作る。
-		// a_angle: すその広さ（0..20）、a_flareCurve: 中間のふくらみ（-10..+15）、a_flareStart: ふくらみの位置バイアス（-50=上寄り..0=中央..+50=下寄り）
-		const float hemWidth = (std::clamp)(a_angle, 0.0f, 20.0f);
-		const float midBulge = (std::clamp)(a_flareCurve, -10.0f, 15.0f);
-		const float biasNorm = (std::clamp)(a_flareStart, -50.0f, 50.0f) / 50.0f;
+		// 丈に依存しない「型紙」の 1 本滑らか曲線（丈を変えても広がり角度・カーブは変わらず、断裁位置だけが変わる）。
+		// a_angle: 広がり（0..30）、a_flareStart: 開始位置（0..100）、a_flareCurve: カーブの形（-50..+50）、a_flareBias: 張り出す位置（-50=上寄り..+50=下寄り）
+		const float flareAmt = (std::clamp)(a_angle, 0.0f, 30.0f);
+		const float startFrac = (std::clamp)(a_flareStart, 0.0f, 100.0f) / 100.0f;
+		const float curveNorm = (std::clamp)(a_flareCurve, -50.0f, 50.0f) / 50.0f;
+		const float biasNorm = (std::clamp)(a_flareBias, -50.0f, 50.0f) / 50.0f;
 		const float biasExp = std::exp(-biasNorm * 0.7f);
-		const float skirtH = (std::max)(a_top - a_hem, 2.0f);
-		auto        smoothMax = [](float a, float b, float k) {
+		constexpr float kRefSpan = 36.0f;                   // 丈に依存しない固定の基準長さ（約 46cm）
+		const float     zStart = a_top - startFrac * kRefSpan;
+		auto            smoothMax = [](float a, float b, float k) {
             const float h = (std::max)(k - std::fabs(a - b), 0.0f) / k;
             return (std::max)(a, b) + h * h * k * 0.25f;
 		};
@@ -934,10 +936,6 @@ namespace Skirt
 				const float r0 = (std::max)(env.Lerp(zf, tf), 1e-3f);
 				const float r0t = env.Lerp((a_top - z0) / kDz - 0.5f, tf);
 
-				// 現在のスカート丈（ウエスト a_top = 0.0 〜 現在のすそ a_hem = 1.0）での正規化位置
-				const float t = (std::clamp)((a_top - p.z) / skirtH, 0.0f, 1.0f);
-				const float u = t > 1e-5f ? std::pow(t, biasExp) : 0.0f;
-
 				// 体の外形も上下の継ぎ目が角ばらないよう滑らかに混ぜる
 				const float bBlend = (std::clamp)((ZB + 4.0f - p.z) / 8.0f, 0.0f, 1.0f);
 				const float bSmooth = bBlend * bBlend * (3.0f - 2.0f * bBlend);
@@ -946,8 +944,8 @@ namespace Skirt
 				const float fadeS = fade * fade * (3.0f - 2.0f * fade);
 				const float rBody = bz + a_ease * fadeS;
 
-				// ベース曲線: ウエスト元の幅 r0t から体のライン rBody へ滑らかに馴染ませる
-				const float wBody = (std::clamp)(t / 0.25f, 0.0f, 1.0f);
+				// ベース曲線: ウエスト元の幅 r0t から体のライン rBody へ滑らかに馴染ませる（丈に依存しない固定距離 6u）
+				const float wBody = (std::clamp)((a_top - p.z) / 6.0f, 0.0f, 1.0f);
 				const float wBodyS = wBody * wBody * (3.0f - 2.0f * wBody);
 				const float rBase = r0t * (1.0f - wBodyS) + rBody * wBodyS;
 
@@ -955,13 +953,17 @@ namespace Skirt
 				if (a_expandOnly) {
 					rt = rBody;
 				} else {
-					// すその広がり: s(u) = u^2 * (2 - u)  （u=0 で値0・傾き0、u=1 で値1・外向きに開く）
-					const float flare = u * u * (2.0f - u);
-					// 中間のふくらみ: bump(u) = sin^2(pi * u)  （u=0,1 で値0・傾き0、u=0.5 で最大1・丸い頂点）
-					const float sPi = std::sin(kPi * u);
-					const float bump = sPi * sPi;
-					const float raw = rBase + hemWidth * flare + midBulge * bump;
-					// 体に沿う境目もハードな max ではなく SmoothMax で丸く繋ぐ
+					const float d = (std::max)(zStart - p.z, 0.0f);
+					// 開始位置 zStart からの最初の 6u で傾き 0 から滑らかに立ち上げるため角ばらない
+					const float rampT = (std::clamp)(d / 6.0f, 0.0f, 1.0f);
+					const float ramp = rampT * rampT * (3.0f - 2.0f * rampT);
+					const float dNorm = d / kRefSpan;
+					const float u = (std::clamp)(dNorm, 0.0f, 1.0f);
+					const float uBias = u > 1e-5f ? std::pow(u, biasExp) : 0.0f;
+					const float sPi = std::sin(kPi * uBias);
+					const float bulge = sPi * sPi;  // 0→1→0 の丸い山。bias で山の高さが上下する
+					const float shaped = (std::max)(dNorm + curveNorm * 0.55f * bulge, 0.0f);
+					const float raw = rBase + (flareAmt * 0.5f) * ramp * shaped;
 					rt = smoothMax(raw, rBody, 1.5f);
 				}
 				// a_keepLayers（鎧）: 重なった板の間隔を保つ。外側（r0）の移動量 rt−r0 を、同じ方位・高さの全頂点へ同じだけ足す。

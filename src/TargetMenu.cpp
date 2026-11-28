@@ -161,36 +161,17 @@ namespace TargetMenu
 			if (!a_movie || a_idx <= 0) {
 				return;
 			}
-			// バニラ MessageBoxMenu.swf: _root.MessageMenu.Buttons[idx].onRollOver() で選択カーソルを移動
-			RE::GFxValue btns;
-			if (a_movie->GetVariable(&btns, "_root.MessageMenu.Buttons") && btns.IsArray()) {
-				if (static_cast<std::uint32_t>(a_idx) < btns.GetArraySize()) {
-					RE::GFxValue btn;
-					if (btns.GetElement(static_cast<std::uint32_t>(a_idx), &btn) && btn.IsObject()) {
-						btn.Invoke("onRollOver", nullptr, nullptr, 0);
-						return;
-					}
-				}
-			}
-			// フォールバック: Button_0 / Button0 系の命名やメンバ確認用ログ（初回のみ）
-			static bool s_logged = false;
-			if (!s_logged) {
-				s_logged = true;
-				RE::GFxValue mc;
-				if (a_movie->GetVariable(&mc, "_root.MessageMenu") && mc.IsObject()) {
-					struct Visitor : RE::GFxValue::ObjectVisitor
-					{
-						std::string names;
-						void        Visit(const char* a_name, const RE::GFxValue&) override
-						{
-							if (a_name) {
-								if (!names.empty()) names += ", ";
-								names += a_name;
-							}
+			// MessageBoxMenu.swf: MessageButtons（実体配列）または Buttons の対象ボタンへ onRollOver を送る
+			for (const char* path : { "_root.MessageMenu.MessageButtons", "_root.MessageMenu.Buttons" }) {
+				RE::GFxValue btns;
+				if (a_movie->GetVariable(&btns, path) && btns.IsArray()) {
+					if (static_cast<std::uint32_t>(a_idx) < btns.GetArraySize()) {
+						RE::GFxValue btn;
+						if (btns.GetElement(static_cast<std::uint32_t>(a_idx), &btn) && btn.IsObject()) {
+							btn.Invoke("onRollOver", nullptr, nullptr, 0);
+							return;
 						}
-					} vis;
-					mc.VisitMembers(&vis);
-					logger::info("TargetMenu: _root.MessageMenu members: {}", vis.names);
+					}
 				}
 			}
 		}
@@ -515,6 +496,7 @@ namespace TargetMenu
 			kFlareAngle,
 			kFlareStart,
 			kFlareCurve,
+			kFlareBias,
 			kSkirtGap,
 			kSkirtGapNoBone,
 		};
@@ -551,38 +533,53 @@ namespace TargetMenu
 				bigStep = 1.0f;
 				break;
 			case FloatField::kFlareAngle:
-				title = Tr("$MSK_FlareText", "Hem width");
+				title = Tr("$MSK_FlareText", "Skirt flare");
 				iniKey = "fFlareAngle";
 				curVal = res.flareAngle;
-				defaultVal = 3.0f;
+				defaultVal = 5.0f;
 				src = res.flareAngleSource;
 				minV = 0.0f;
-				maxV = 20.0f;
-				smallStep = 0.5f;
-				bigStep = 2.0f;
+				maxV = 30.0f;
+				smallStep = 1.0f;
+				bigStep = 5.0f;
+				isInt = true;
 				break;
 			case FloatField::kFlareStart:
-				title = Tr("$MSK_FlareStartText", "Curve bias");
+				title = Tr("$MSK_FlareStartText", "Flare start (%)");
 				iniKey = "fFlareStart";
 				curVal = res.flareStart;
 				defaultVal = 0.0f;
 				src = res.flareStartSource;
+				minV = 0.0f;
+				maxV = 100.0f;
+				smallStep = 5.0f;
+				bigStep = 20.0f;
+				unit = "%";
+				isInt = true;
+				break;
+			case FloatField::kFlareCurve:
+				title = Tr("$MSK_FlareCurveText", "Curve shape");
+				iniKey = "fFlareCurve";
+				curVal = res.flareCurve;
+				defaultVal = 0.0f;
+				src = res.flareCurveSource;
 				minV = -50.0f;
 				maxV = 50.0f;
 				smallStep = 5.0f;
 				bigStep = 15.0f;
 				isInt = true;
 				break;
-			case FloatField::kFlareCurve:
-				title = Tr("$MSK_FlareCurveText", "Mid fullness");
-				iniKey = "fFlareCurve";
-				curVal = res.flareCurve;
+			case FloatField::kFlareBias:
+				title = Tr("$MSK_FlareBiasText", "Curve bias");
+				iniKey = "fFlareBias";
+				curVal = res.flareBias;
 				defaultVal = 0.0f;
-				src = res.flareCurveSource;
-				minV = -10.0f;
-				maxV = 15.0f;
-				smallStep = 0.5f;
-				bigStep = 2.0f;
+				src = res.flareBiasSource;
+				minV = -50.0f;
+				maxV = 50.0f;
+				smallStep = 5.0f;
+				bigStep = 15.0f;
+				isInt = true;
 				break;
 			case FloatField::kSkirtGap:
 				title = Tr("$MSK_GapText", "Skirt / Leg Gap");
@@ -650,6 +647,9 @@ namespace TargetMenu
                             case FloatField::kFlareCurve:
                                 r.flareCurve = v;
                                 break;
+                            case FloatField::kFlareBias:
+                                r.flareBias = v;
+                                break;
                             case FloatField::kSkirtGap:
                                 r.skirtGap = v;
                                 break;
@@ -677,7 +677,7 @@ namespace TargetMenu
 						OpenFloatSubMenu(a_actorId, a_armorId, a_scope, a_field, a_idx);
 					} else {
 						if (a_field == FloatField::kHipEase || a_field == FloatField::kFlareAngle || a_field == FloatField::kFlareStart ||
-						    a_field == FloatField::kFlareCurve) {
+						    a_field == FloatField::kFlareCurve || a_field == FloatField::kFlareBias) {
 							OpenFlareSubMenu(a_actorId, a_armorId, a_scope);
 						} else {
 							OpenDetailSubMenu(a_actorId, a_armorId, a_scope);
@@ -708,8 +708,9 @@ namespace TargetMenu
 			{
 				kLen,
 				kFlare,
-				kFlareCurve,
 				kFlareStart,
+				kFlareCurve,
+				kFlareBias,
 				kHip,
 				kReset,
 				kBack,
@@ -719,12 +720,14 @@ namespace TargetMenu
 
 			buttons.push_back(std::format("{}: {:.0f}% ({})...", Tr("$MSK_MenuLenLabel", "Length"), res.lengthPct, SourceLabel(res.lengthSource)));
 			actions.push_back(SAct::kLen);
-			buttons.push_back(std::format("{}: {:.1f} ({})...", Tr("$MSK_FlareText", "Hem width"), res.flareAngle, SourceLabel(res.flareAngleSource)));
+			buttons.push_back(std::format("{}: {:.0f} ({})...", Tr("$MSK_FlareText", "Skirt flare"), res.flareAngle, SourceLabel(res.flareAngleSource)));
 			actions.push_back(SAct::kFlare);
-			buttons.push_back(std::format("{}: {:.1f} ({})...", Tr("$MSK_FlareCurveText", "Mid fullness"), res.flareCurve, SourceLabel(res.flareCurveSource)));
-			actions.push_back(SAct::kFlareCurve);
-			buttons.push_back(std::format("{}: {:.0f} ({})...", Tr("$MSK_FlareStartText", "Curve bias"), res.flareStart, SourceLabel(res.flareStartSource)));
+			buttons.push_back(std::format("{}: {:.0f}% ({})...", Tr("$MSK_FlareStartText", "Flare start (%)"), res.flareStart, SourceLabel(res.flareStartSource)));
 			actions.push_back(SAct::kFlareStart);
+			buttons.push_back(std::format("{}: {:.0f} ({})...", Tr("$MSK_FlareCurveText", "Curve shape"), res.flareCurve, SourceLabel(res.flareCurveSource)));
+			actions.push_back(SAct::kFlareCurve);
+			buttons.push_back(std::format("{}: {:.0f} ({})...", Tr("$MSK_FlareBiasText", "Curve bias"), res.flareBias, SourceLabel(res.flareBiasSource)));
+			actions.push_back(SAct::kFlareBias);
 			buttons.push_back(std::format("{}: {:.1f} ({})...", Tr("$MSK_HipEaseText", "Room around the hips"), res.hipEase, SourceLabel(res.hipEaseSource)));
 			actions.push_back(SAct::kHip);
 
@@ -754,6 +757,9 @@ namespace TargetMenu
 				case SAct::kFlareCurve:
 					OpenFloatSubMenu(a_actorId, a_armorId, a_scope, FloatField::kFlareCurve);
 					break;
+				case SAct::kFlareBias:
+					OpenFloatSubMenu(a_actorId, a_armorId, a_scope, FloatField::kFlareBias);
+					break;
 				case SAct::kHip:
 					OpenFloatSubMenu(a_actorId, a_armorId, a_scope, FloatField::kHipEase);
 					break;
@@ -764,6 +770,7 @@ namespace TargetMenu
 						r.flareAngle.reset();
 						r.flareStart.reset();
 						r.flareCurve.reset();
+						r.flareBias.reset();
 					};
 					if (a_scope == Scope::kNpc && act) {
 						Overrides::UpdateNpc(act, fn);

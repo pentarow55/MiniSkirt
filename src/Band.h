@@ -21,7 +21,7 @@ namespace Band
 	// 角度・高さは帯の体から測る。袖（腕の骨の重み、または体の腕・手に近い頂点）は動かさない。一度作ったら設定が変わるまで作り直さない
 	// a_expandOnly: 切らなかったスカート。形は元のまま、帯の体（差し替えた脚の腰）に当たる所だけ外へ出す
 	void ShapeSkirt(RE::Actor* a_actor, const std::vector<RE::BSGeometry*>& a_skirts, float a_waist, float a_hem, float a_ease, float a_angle, bool a_keepLayers = false,
-		bool a_expandOnly = false, float a_flareStart = 0.0f, float a_flareCurve = 0.0f);
+		bool a_expandOnly = false, float a_flareStart = 0.0f, float a_flareCurve = 0.0f, float a_flareBias = 0.0f);
 	// 帯を付けた NPC の縮めたスカートを、帯の体から離す（A: 足りない分だけ外へ押し出す。
 	// B: スカートの骨の一覧にお尻の揺れ骨があれば、お尻を覆う頂点にその重みを混ぜる）。
 	// a_gap: B が使えるときのすき間、a_gapNoBone: 使えないときのすき間

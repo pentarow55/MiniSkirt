@@ -37,13 +37,16 @@ namespace Overrides
 				a_r.hipEase = Round1(std::clamp(*a_r.hipEase, 0.0f, 8.0f));
 			}
 			if (a_r.flareAngle.has_value()) {
-				a_r.flareAngle = Round1(std::clamp(*a_r.flareAngle, 0.0f, 20.0f));
+				a_r.flareAngle = Round1(std::clamp(*a_r.flareAngle, 0.0f, 30.0f));
 			}
 			if (a_r.flareStart.has_value()) {
-				a_r.flareStart = Round1(std::clamp(*a_r.flareStart, -50.0f, 50.0f));
+				a_r.flareStart = Round1(std::clamp(*a_r.flareStart, 0.0f, 100.0f));
 			}
 			if (a_r.flareCurve.has_value()) {
-				a_r.flareCurve = Round1(std::clamp(*a_r.flareCurve, -10.0f, 15.0f));
+				a_r.flareCurve = Round1(std::clamp(*a_r.flareCurve, -50.0f, 50.0f));
+			}
+			if (a_r.flareBias.has_value()) {
+				a_r.flareBias = Round1(std::clamp(*a_r.flareBias, -50.0f, 50.0f));
 			}
 			if (a_r.skirtGap.has_value()) {
 				a_r.skirtGap = Round1(std::clamp(*a_r.skirtGap, 0.0f, 8.0f));
@@ -121,6 +124,9 @@ namespace Overrides
 				if (auto fc = v.find("flareCurve"); fc != v.end() && fc->is_number()) {
 					r.flareCurve = fc->get<float>();
 				}
+				if (auto fb = v.find("flareBias"); fb != v.end() && fb->is_number()) {
+					r.flareBias = fb->get<float>();
+				}
 				if (auto rl = v.find("replaceLegs"); rl != v.end() && rl->is_boolean()) {
 					r.replaceLegs = rl->get<bool>();
 				}
@@ -171,6 +177,9 @@ namespace Overrides
 				}
 				if (r.flareCurve.has_value()) {
 					item["flareCurve"] = Round1(*r.flareCurve);
+				}
+				if (r.flareBias.has_value()) {
+					item["flareBias"] = Round1(*r.flareBias);
 				}
 				if (r.replaceLegs.has_value()) {
 					item["replaceLegs"] = *r.replaceLegs;
@@ -245,6 +254,10 @@ namespace Overrides
 				a_out.flareCurve = *a_r.flareCurve;
 				a_out.flareCurveSource = a_src;
 			}
+			if (a_r.flareBias.has_value()) {
+				a_out.flareBias = *a_r.flareBias;
+				a_out.flareBiasSource = a_src;
+			}
 			if (a_r.replaceLegs.has_value()) {
 				a_out.replaceLegs = *a_r.replaceLegs;
 				a_out.replaceLegsSource = a_src;
@@ -314,9 +327,10 @@ namespace Overrides
 		out.lengthPct = std::clamp(a_global.lengthPct, kMinLength, kMaxLength);
 		out.hemStyle = std::clamp(a_global.hemStyle, 0, 1);
 		out.hipEase = std::clamp(a_global.hipEase, 0.0f, 8.0f);
-		out.flareAngle = std::clamp(a_global.flareAngle, 0.0f, 20.0f);
-		out.flareStart = std::clamp(a_global.flareStart, -50.0f, 50.0f);
-		out.flareCurve = std::clamp(a_global.flareCurve, -10.0f, 15.0f);
+		out.flareAngle = std::clamp(a_global.flareAngle, 0.0f, 30.0f);
+		out.flareStart = std::clamp(a_global.flareStart, 0.0f, 100.0f);
+		out.flareCurve = std::clamp(a_global.flareCurve, -50.0f, 50.0f);
+		out.flareBias = std::clamp(a_global.flareBias, -50.0f, 50.0f);
 		out.replaceLegs = a_global.replaceLegs;
 		out.underwear = a_global.underwear;
 		out.skirtGap = std::clamp(a_global.skirtGap, 0.0f, 8.0f);

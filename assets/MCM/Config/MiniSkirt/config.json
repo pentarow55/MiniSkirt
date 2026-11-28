@@ -5,6 +5,36 @@
   "cursorFillMode": "topToBottom",
   "content": [
     {
+      "text": "$MSK_PerTargetText",
+      "type": "header"
+    },
+    {
+      "text": "$MSK_PerTargetHintText",
+      "help": "$MSK_PerTargetHintHelp",
+      "type": "text"
+    },
+    {
+      "id": "iTargetHotkey:General",
+      "text": "$MSK_TargetHotkeyText",
+      "help": "$MSK_TargetHotkeyHelp",
+      "type": "keymap",
+      "valueOptions": {
+        "sourceType": "ModSettingInt"
+      }
+    },
+    {
+      "id": "bLearnAdjustPower:General",
+      "text": "$MSK_LearnAdjustPowerText",
+      "help": "$MSK_LearnAdjustPowerHelp",
+      "type": "toggle",
+      "valueOptions": {
+        "sourceType": "ModSettingBool"
+      }
+    },
+    {
+      "type": "empty"
+    },
+    {
       "text": "$MSK_GeneralText",
       "type": "header"
     },
@@ -79,9 +109,22 @@
       "type": "slider",
       "valueOptions": {
         "min": 0,
-        "max": 20,
-        "step": 0.5,
-        "formatString": "{1}",
+        "max": 30,
+        "step": 1,
+        "formatString": "{0}",
+        "sourceType": "ModSettingFloat"
+      }
+    },
+    {
+      "id": "fFlareStart:General",
+      "text": "$MSK_FlareStartText",
+      "help": "$MSK_FlareStartHelp",
+      "type": "slider",
+      "valueOptions": {
+        "min": 0,
+        "max": 100,
+        "step": 5,
+        "formatString": "{0}",
         "sourceType": "ModSettingFloat"
       }
     },
@@ -91,17 +134,17 @@
       "help": "$MSK_FlareCurveHelp",
       "type": "slider",
       "valueOptions": {
-        "min": -10,
-        "max": 15,
-        "step": 0.5,
-        "formatString": "{1}",
+        "min": -50,
+        "max": 50,
+        "step": 5,
+        "formatString": "{0}",
         "sourceType": "ModSettingFloat"
       }
     },
     {
-      "id": "fFlareStart:General",
-      "text": "$MSK_FlareStartText",
-      "help": "$MSK_FlareStartHelp",
+      "id": "fFlareBias:General",
+      "text": "$MSK_FlareBiasText",
+      "help": "$MSK_FlareBiasHelp",
       "type": "slider",
       "valueOptions": {
         "min": -50,
@@ -171,31 +214,6 @@
         "step": 0.5,
         "formatString": "{1}",
         "sourceType": "ModSettingFloat"
-      }
-    },
-    {
-      "type": "empty"
-    },
-    {
-      "text": "$MSK_PerTargetText",
-      "type": "header"
-    },
-    {
-      "id": "iTargetHotkey:General",
-      "text": "$MSK_TargetHotkeyText",
-      "help": "$MSK_TargetHotkeyHelp",
-      "type": "keymap",
-      "valueOptions": {
-        "sourceType": "ModSettingInt"
-      }
-    },
-    {
-      "id": "bLearnAdjustPower:General",
-      "text": "$MSK_LearnAdjustPowerText",
-      "help": "$MSK_LearnAdjustPowerHelp",
-      "type": "toggle",
-      "valueOptions": {
-        "sourceType": "ModSettingBool"
       }
     }
   ]

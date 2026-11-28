@@ -10,6 +10,11 @@ ASSETS = ROOT / "assets"
 
 # 画面の並び（鍵の名前 → 種類など）。鍵は Text / Help で終え、ほかの鍵の頭と重ならないようにする
 LAYOUT = [
+    {"type": "header", "key": "PerTarget"},
+    {"type": "text", "key": "PerTargetHint"},
+    {"type": "keymap", "key": "TargetHotkey", "id": "iTargetHotkey:General"},
+    {"type": "toggle", "key": "LearnAdjustPower", "id": "bLearnAdjustPower:General"},
+    {"type": "empty"},
     {"type": "header", "key": "General"},
     {"type": "toggle", "key": "Enabled", "id": "bEnabled:General"},
     {"type": "toggle", "key": "Elderly", "id": "bExcludeElderly:General"},
@@ -18,19 +23,16 @@ LAYOUT = [
     {"type": "slider", "key": "Hem", "id": "fSkirtLength:General", "min": 10, "max": 100, "step": 1, "fmt": "{0}"},
     {"type": "stepper", "key": "CutStyle", "id": "iHemStyle:General", "options": ["CutOptRough", "CutOptLevel"]},
     {"type": "slider", "key": "HipEase", "id": "fHipEase:General", "min": 0, "max": 8, "step": 0.5, "fmt": "{1}"},
-    {"type": "slider", "key": "Flare", "id": "fFlareAngle:General", "min": 0, "max": 20, "step": 0.5, "fmt": "{1}"},
-    {"type": "slider", "key": "FlareCurve", "id": "fFlareCurve:General", "min": -10, "max": 15, "step": 0.5, "fmt": "{1}"},
-    {"type": "slider", "key": "FlareStart", "id": "fFlareStart:General", "min": -50, "max": 50, "step": 5, "fmt": "{0}"},
+    {"type": "slider", "key": "Flare", "id": "fFlareAngle:General", "min": 0, "max": 30, "step": 1, "fmt": "{0}"},
+    {"type": "slider", "key": "FlareStart", "id": "fFlareStart:General", "min": 0, "max": 100, "step": 5, "fmt": "{0}"},
+    {"type": "slider", "key": "FlareCurve", "id": "fFlareCurve:General", "min": -50, "max": 50, "step": 5, "fmt": "{0}"},
+    {"type": "slider", "key": "FlareBias", "id": "fFlareBias:General", "min": -50, "max": 50, "step": 5, "fmt": "{0}"},
     {"type": "header", "key": "Legs", "position": 1},
     {"type": "toggle", "key": "ReplaceLegs", "id": "bReplaceLegs:General"},
     {"type": "slider", "key": "LegTop", "id": "fBandTop:General", "min": 50, "max": 90, "step": 1, "fmt": "{0}"},
     {"type": "toggle", "key": "Underwear", "id": "bUnderwear:General"},
     {"type": "slider", "key": "Gap", "id": "fSkirtGap:General", "min": 0, "max": 8, "step": 0.5, "fmt": "{1}"},
     {"type": "slider", "key": "GapStiff", "id": "fSkirtGapNoBone:General", "min": 0, "max": 10, "step": 0.5, "fmt": "{1}"},
-    {"type": "empty"},
-    {"type": "header", "key": "PerTarget"},
-    {"type": "keymap", "key": "TargetHotkey", "id": "iTargetHotkey:General"},
-    {"type": "toggle", "key": "LearnAdjustPower", "id": "bLearnAdjustPower:General"},
 ]
 
 # 日本語のフォントに無い字（例: 裾、≒）は使わない。目安は「数: 説明」の形にする（≒ は空白に見えた）。
@@ -47,16 +49,18 @@ T["JAPANESE"] = {
     "CutOptRough": "ラフ",
     "CutOptLevel": "水平",
     "HipEase": ("お尻まわりのゆとり", "スカートを、お尻・太もものいちばん外に出ている所からどれだけ離してふくらませるか。お尻がスカートを突き抜けるときは大きくします。0 だと体にぴったりになり、立っているときでも体が突き抜けやすくなります。"),
-    "Flare": ("すその広さ", "現在のすそを外へ広げる幅。0だとタイトに体に沿い、大きくするほどAライン・フレアになります。"),
-    "FlareStart": ("ふくらみの位置", "カーブの重心位置。0: 現在のスカート丈のど真ん中（既定） / マイナス: 上寄り（ハイウエスト風） / プラス: すそ寄り。"),
-    "FlareCurve": ("中間のふくらみ", "現在のスカート丈の中間地点のふくらみ。0: まっすぐAライン / プラス: ベル型・バルーン型 / マイナス: 中間を絞るマーメイド型。"),
+    "Flare": ("スカートの広がり", "広がりの強さ。0だとタイトに体に沿い、大きくするほどAライン・フレアになります。丈を変えても広がり角度は変わりません。"),
+    "FlareStart": ("広がりの開始位置（%）", "どこから広げ始めるか。0: ウエスト直下から / 50: 腰〜ヒップ下から / 100: 太もも付近まで沿ってから広がります。"),
+    "FlareCurve": ("カーブの形", "広がり方の曲がり具合。0: まっすぐAライン / プラス: 上から丸く膨らむベル型 / マイナス: 下ほど急に広がるトランペット型。"),
+    "FlareBias": ("カーブの張り出し位置", "カーブがいちばん高くなる（またはくびれる）位置。0: 標準 / マイナス: 上寄り / プラス: 下寄り。"),
     "Legs": "スカートの中の脚",
     "ReplaceLegs": ("本人の脚を使う", "オン（既定）にすると服に付いている脚を隠し、本人の素体（CBBEなど）の脚を表示します。タイツ付きの衣装などで服の元の脚をそのまま残したいときはオフにします。"),
     "LegTop": ("足す脚の上端の高さ", "スカートを短くすると、服の中の脚がとちゅうで切れて見えます。そこで服の中の脚を消し、代わりに裸の脚を足首からこの高さまで足します。80: 腰骨の少し下（股・お尻まで見える）、64: 股の少し下（股・お尻は見えない）。"),
     "Underwear": ("下着を着ける", "足した脚を、下着を着けた体にします。NPC の持ち物や服装から下着らしい物を選び、無ければ入っている下着 MOD から NPC ごとに 1 つ決めます（下着 MOD が無ければ裸のまま）。"),
     "Gap": ("スカートと脚のすき間", "スカートを脚から離す幅。近すぎる所だけ外へ押し出します（お尻の揺れに合わせてスカートも動く服）。お尻がスカートから突き抜けるときは大きくします。"),
     "GapStiff": ("すき間（スカートが揺れない服）", "お尻が揺れてもスカートがいっしょに動かない服での、スカートと脚のすき間。突き抜けやすいので広めにします。"),
-    "PerTarget": "個別設定（NPC / 衣装）",
+    "PerTarget": "ゲーム内ライブ調整（NPC別・衣装別）",
+    "PerTargetHint": ("※NPCの前で調整キー（既定: F10）を押すと、見た目を見ながら個別・衣装別・全体を調整できます", "ゲーム中に女性NPCの前で調整キー（既定: F10）を押すと、画面左側にメニューが開き、見た目を確認しながら丈や形をリアルタイム調整できます。"),
     "TargetHotkey": ("対象を調整するキー", "目の前の女性 NPC に対して、その NPC 個別または着ている衣装ごとのスカート丈・除外を設定するメニューを開きます。設定は全セーブ共通のファイルに保存されます。"),
     "LearnAdjustPower": ("調整パワーを習得（VR / パッド向け）", "オンにすると、目の前の女性 NPC の丈・除外メニューを開くパワー「MiniSkirt: Adjust Target」を習得します。キーボードを使わない VR やコントローラー環境で便利です。"),
 }
@@ -71,16 +75,18 @@ T["ENGLISH"] = {
     "CutOptRough": "Rough",
     "CutOptLevel": "Level",
     "HipEase": ("Room around the hips", "How far the skirt stands off from the widest part of the hips and thighs. Increase it if the buttocks poke through the skirt. At 0 the skirt fits skin-tight and the body pokes through more easily, even when standing."),
-    "Flare": ("Hem width", "How wide the current hem flares outward. 0 keeps a tight pencil fit; larger values create A-line and flared skirts."),
-    "FlareStart": ("Curve bias", "Shifts the peak of the curve. 0: exact middle of the current skirt (default) / negative: higher toward the waist / positive: lower toward the hem."),
-    "FlareCurve": ("Mid fullness", "Fullness at the middle of the current skirt length. 0: smooth A-line / positive: bell or balloon curve / negative: slimmer waist-to-mid with flared hem."),
+    "Flare": ("Skirt flare", "Overall flare strength. 0 keeps a tight pencil fit; larger values create A-line and flared skirts. Changing skirt length does not alter the flare angle."),
+    "FlareStart": ("Flare start (%)", "Height where the flare begins. 0: right below the waist / 50: below the hips / 100: stays fitted down to the thighs before flaring."),
+    "FlareCurve": ("Curve shape", "Curvature of the flare. 0: straight A-line / positive: rounded bell curve / negative: fitted upper skirt flaring sharply near the bottom."),
+    "FlareBias": ("Curve bias", "Shifts where the curve peaks (or narrows). 0: balanced / negative: higher toward the waist / positive: lower toward the hem."),
     "Legs": "Legs Under the Skirt",
     "ReplaceLegs": ("Use character's own legs", "When on (default), hides the legs built into the outfit and shows the character's own body legs (CBBE, etc.). Turn off for outfits with built-in tights or stockings."),
     "LegTop": ("Top of the added legs", "A shortened skirt would show the outfit's legs cut off partway. So the outfit's legs are hidden and bare legs are added from the ankles up to this height. 80: just below the hip bones (crotch and buttocks visible), 64: just below the crotch (not visible)."),
     "Underwear": ("Wear underwear", "Puts underwear on the added legs. Picks something underwear-like from the NPC's inventory or outfit; otherwise picks one per NPC from installed underwear mods (bare if there are none)."),
     "Gap": ("Gap between skirt and legs", "How far the skirt is kept from the legs. Only the parts that are too close are pushed out (outfits whose skirt moves with the buttocks). Increase it if the buttocks poke through."),
     "GapStiff": ("Gap (skirts that don't sway)", "Gap between skirt and legs for outfits whose skirt does not move when the buttocks jiggle. Set it wider, since these poke through more easily."),
-    "PerTarget": "Per-NPC / Per-Outfit",
+    "PerTarget": "In-Game Live Menu (Per-NPC / Per-Outfit)",
+    "PerTargetHint": ("Tip: Press Hotkey (default F10) facing an NPC to adjust live", "Press the hotkey (default: F10) while facing a female NPC to open the live adjustment menu for that NPC, their outfit, or global settings."),
     "TargetHotkey": ("Adjust Target Hotkey", "Press while looking at a female NPC to change the skirt length or exclusion for that NPC or their outfit. Saved to a shared config file across all saves."),
     "LearnAdjustPower": ("Learn Adjust Power (VR / Gamepad)", "When on, grants the lesser power 'MiniSkirt: Adjust Target' to open the per-NPC / per-outfit menu without a keyboard."),
 }
@@ -98,6 +104,7 @@ T["FRENCH"] = {
     "Flare": ("Évasement de l'ourlet", "Angle (degrés) d'évasement de la jupe vers l'ourlet. 0 tombe droit ; plus la valeur est grande, plus l'ourlet s'évase."),
     "FlareStart": ("Début de l'évasement (%)", "Hauteur où commence l'évasement. 0 : ligne des hanches (défaut) / 100 : juste sous la taille (évase toute la jupe)."),
     "FlareCurve": ("Ampleur à mi-hauteur", "Volume supplémentaire à mi-chemin entre le début et l'ourlet. 0 : ligne A droite / positif : forme cloche ou ballon / négatif : milieu ajusté."),
+    "FlareBias": ("Position de la courbe", "Déplace le point le plus marqué de la courbe. 0 : centré / négatif : plus haut / positif : plus bas."),
     "Legs": "Jambes sous la jupe",
     "ReplaceLegs": ("Utiliser les jambes du personnage", "Activé (défaut) : masque les jambes de la tenue et affiche celles du corps du personnage. Désactivez pour les tenues avec collants."),
     "LegTop": ("Haut des jambes ajoutées", "Une jupe raccourcie montrerait les jambes de la tenue coupées à mi-hauteur. Elles sont donc masquées et des jambes nues sont ajoutées des chevilles jusqu'à cette hauteur. 80: juste sous les hanches (entrejambe et fesses visibles), 64: juste sous l'entrejambe (non visibles)."),
@@ -105,6 +112,7 @@ T["FRENCH"] = {
     "Gap": ("Écart jupe / jambes", "Distance gardée entre la jupe et les jambes. Seules les parties trop proches sont repoussées (tenues dont la jupe suit le mouvement des fesses). Augmentez si les fesses traversent."),
     "GapStiff": ("Écart (jupes rigides)", "Écart pour les tenues dont la jupe ne suit pas le mouvement des fesses. Mettez-le plus grand, car elles traversent plus facilement."),
     "PerTarget": "Par PNJ / Par tenue",
+    "PerTargetHint": ("Astuce : Touche (F10) devant un PNJ pour ajuster en direct", "Appuyez sur la touche (défaut : F10) face à un PNJ féminin pour ajuster ce PNJ, sa tenue ou les réglages généraux en direct."),
     "TargetHotkey": ("Touche d'ajustement", "Appuyez en regardant un PNJ féminin pour régler la longueur ou l'exclusion pour ce PNJ ou sa tenue."),
     "LearnAdjustPower": ("Pouvoir d'ajustement (VR / Manette)", "Active le pouvoir 'MiniSkirt: Adjust Target' pour ouvrir le menu sans clavier."),
 }
@@ -122,6 +130,7 @@ T["GERMAN"] = {
     "Flare": ("Ausstellwinkel des Saums", "Winkel (Grad), in dem der Rock zum Saum hin ausgestellt wird. 0 fällt gerade; größere Werte stellen den Saum weiter aus."),
     "FlareStart": ("Beginn der Ausstellung (%)", "Höhe, ab der der Rock ausgestellt wird. 0: Hüftlinie (Standard) / 100: direkt unter der Taille (ganzer Rock)."),
     "FlareCurve": ("Weite in der Rockmitte", "Zusätzliche Weite in der Mitte zwischen Beginn und Saum. 0: gerade A-Linie / positiv: Glocken- oder Ballonform / negativ: schmale Mitte."),
+    "FlareBias": ("Kurvenschwerpunkt", "Verschiebt den Höhepunkt der Kurve. 0: mittig / negativ: höher / positiv: tiefer."),
     "Legs": "Beine unter dem Rock",
     "ReplaceLegs": ("Eigene Beine des Charakters nutzen", "Ein (Standard): Verbirgt die Beine der Kleidung und zeigt den eigenen Körper des Charakters. Aus für Outfits mit Strumpfhosen."),
     "LegTop": ("Obere Grenze der Beine", "Ein gekürzter Rock würde die Beine der Kleidung abgeschnitten zeigen. Deshalb werden sie ausgeblendet und nackte Beine von den Knöcheln bis zu dieser Höhe hinzugefügt. 80: knapp unter den Hüftknochen (Schritt und Po sichtbar), 64: knapp unter dem Schritt (nicht sichtbar)."),
@@ -129,6 +138,7 @@ T["GERMAN"] = {
     "Gap": ("Abstand Rock / Beine", "Abstand, den der Rock zu den Beinen hält. Nur zu nahe Stellen werden nach außen gedrückt (Kleidung, deren Rock sich mit dem Po bewegt). Erhöhen, wenn der Po durchragt."),
     "GapStiff": ("Abstand (starre Röcke)", "Abstand für Kleidung, deren Rock sich nicht mit dem Po mitbewegt. Größer wählen, da sie leichter durchragt."),
     "PerTarget": "Pro NPC / Pro Kleidung",
+    "PerTargetHint": ("Tipp: Taste (Standard F10) vor NPC für Live-Anpassung", "Drücke die Taste (Standard: F10) vor einem weiblichen NPC, um Länge und Form pro NPC, Kleidung oder global live anzupassen."),
     "TargetHotkey": ("Taste zum Anpassen", "Drücken, während ein weiblicher NPC anvisiert wird, um Länge oder Ausnahme für diesen NPC oder die Kleidung einzustellen."),
     "LearnAdjustPower": ("Anpassungskraft lernen (VR / Controller)", "Verleiht die Kraft 'MiniSkirt: Adjust Target', um das Menü ohne Tastatur zu öffnen."),
 }
@@ -146,6 +156,7 @@ T["SPANISH"] = {
     "Flare": ("Ángulo de vuelo del bajo", "Ángulo (grados) con que la falda se abre hacia el bajo. 0 cae recta; valores mayores abren más el bajo."),
     "FlareStart": ("Inicio del vuelo (%)", "Altura donde empieza el vuelo. 0: línea de cadera (por defecto) / 100: justo bajo la cintura (toda la falda)."),
     "FlareCurve": ("Vuelo en la zona media", "Volumen extra a mitad entre el inicio y el bajo. 0: línea A recta / positivo: forma campana o globo / negativo: medio ceñido."),
+    "FlareBias": ("Posición de la curva", "Desplaza el punto más pronunciado de la curva. 0: centrado / negativo: más arriba / positivo: más abajo."),
     "Legs": "Piernas bajo la falda",
     "ReplaceLegs": ("Usar piernas propias del personaje", "Activado (por defecto): oculta las piernas del atuendo y muestra el cuerpo propio del personaje. Desactívalo para atuendos con medias."),
     "LegTop": ("Límite superior de las piernas", "Una falda acortada mostraría las piernas de la ropa cortadas a medias. Por eso se ocultan y se añaden piernas desnudas desde los tobillos hasta esta altura. 80: justo bajo las caderas (entrepierna y glúteos visibles), 64: justo bajo la entrepierna (no visibles)."),
@@ -153,6 +164,7 @@ T["SPANISH"] = {
     "Gap": ("Separación falda / piernas", "Distancia que la falda guarda respecto a las piernas. Solo se empujan hacia fuera las partes demasiado cercanas (ropa cuya falda se mueve con los glúteos). Auméntala si los glúteos la atraviesan."),
     "GapStiff": ("Separación (faldas rígidas)", "Separación para ropa cuya falda no se mueve con los glúteos. Ponla más amplia, ya que se atraviesa con más facilidad."),
     "PerTarget": "Por PNJ / Por atuendo",
+    "PerTargetHint": ("Consejo: Pulsa tecla (F10) ante una PNJ para ajustar en vivo", "Pulsa la tecla (por defecto: F10) mirando a una PNJ para ajustar esa PNJ, su atuendo o los ajustes globales en tiempo real."),
     "TargetHotkey": ("Tecla de ajuste", "Pulsa mirando a una PNJ para cambiar el largo o la exclusión de esa PNJ o su atuendo."),
     "LearnAdjustPower": ("Aprender poder de ajuste (VR / Mando)", "Otorga el poder 'MiniSkirt: Adjust Target' para abrir el menú sin teclado."),
 }
@@ -170,6 +182,7 @@ T["ITALIAN"] = {
     "Flare": ("Svasatura dell'orlo", "Angolo (gradi) con cui la gonna si allarga verso l'orlo. 0 scende dritta; valori più alti allargano di più l'orlo."),
     "FlareStart": ("Inizio svasatura (%)", "Altezza da cui inizia la svasatura. 0: linea dei fianchi (predefinito) / 100: subito sotto la vita (tutta la gonna)."),
     "FlareCurve": ("Ampiezza a metà gonna", "Volume extra a metà tra inizio e orlo. 0: linea A dritta / positivo: forma a campana o palloncino / negativo: centro più aderente."),
+    "FlareBias": ("Posizione della curva", "Sposta il punto di massima curvatura. 0: bilanciato / negativo: più in alto / positivo: più in basso."),
     "Legs": "Gambe sotto la gonna",
     "ReplaceLegs": ("Usa le gambe del personaggio", "Attivo (predefinito): nasconde le gambe dell'abito e mostra quelle del corpo del personaggio. Disattiva per abiti con collant."),
     "LegTop": ("Limite superiore delle gambe", "Una gonna accorciata mostrerebbe le gambe del vestito tagliate a metà. Perciò vengono nascoste e si aggiungono gambe nude dalle caviglie fino a questa altezza. 80: appena sotto le anche (inguine e glutei visibili), 64: appena sotto l'inguine (non visibili)."),
@@ -177,6 +190,7 @@ T["ITALIAN"] = {
     "Gap": ("Distanza gonna / gambe", "Distanza che la gonna mantiene dalle gambe. Solo le parti troppo vicine vengono spinte fuori (vestiti la cui gonna si muove con i glutei). Aumentala se i glutei la attraversano."),
     "GapStiff": ("Distanza (gonne rigide)", "Distanza per i vestiti la cui gonna non si muove con i glutei. Impostala più ampia, perché si attraversa più facilmente."),
     "PerTarget": "Per PNG / Per abito",
+    "PerTargetHint": ("Suggerimento: Premi tasto (F10) davanti a un PNG per regolare dal vivo", "Premi il tasto (predefinito: F10) davanti a un PNG femminile per regolare quel PNG, il suo abito o le opzioni globali dal vivo."),
     "TargetHotkey": ("Tasto di regolazione", "Premi guardando un PNG femminile per cambiare lunghezza o esclusione per quel PNG o il suo abito."),
     "LearnAdjustPower": ("Impara potere di regolazione (VR / Pad)", "Concede il potere 'MiniSkirt: Adjust Target' per aprire il menu senza tastiera."),
 }
@@ -194,6 +208,7 @@ T["POLISH"] = {
     "Flare": ("Kąt rozkloszowania", "Kąt (stopnie), pod jakim spódnica rozchodzi się ku dołowi. 0 opada prosto; większe wartości bardziej rozszerzają brzeg."),
     "FlareStart": ("Początek rozkloszowania (%)", "Wysokość, od której spódnica się rozszerza. 0: linia bioder (domyślnie) / 100: tuż pod talią (cała spódnica)."),
     "FlareCurve": ("Szerokość w połowie", "Dodatkowa objętość w połowie między początkiem a brzegiem. 0: prosta linia A / plus: krój dzwonu lub balonu / minus: węższy środek."),
+    "FlareBias": ("Pozycja krzywej", "Przesuwa szczyt krzywej w górę lub w dół. 0: środek / minus: wyżej / plus: niżej."),
     "Legs": "Nogi pod spódnicą",
     "ReplaceLegs": ("Użyj własnych nóg postaci", "Włączone (domyślnie): ukrywa nogi stroju i pokazuje nogi ciała postaci. Wyłącz dla strojów z rajstopami."),
     "LegTop": ("Górna granica nóg", "Skrócona spódnica pokazałaby ucięte w połowie nogi stroju. Dlatego są ukrywane, a nagie nogi dodawane od kostek do tej wysokości. 80: tuż pod kośćmi biodrowymi (krocze i pośladki widoczne), 64: tuż pod kroczem (niewidoczne)."),
@@ -201,6 +216,7 @@ T["POLISH"] = {
     "Gap": ("Odstęp spódnica / nogi", "Odstęp spódnicy od nóg. Na zewnątrz odsuwane są tylko zbyt bliskie miejsca (stroje, których spódnica porusza się z pośladkami). Zwiększ, jeśli pośladki przebijają."),
     "GapStiff": ("Odstęp (sztywne spódnice)", "Odstęp dla strojów, których spódnica nie porusza się z pośladkami. Ustaw większy, bo łatwiej je przebić."),
     "PerTarget": "Dla NPC / Dla stroju",
+    "PerTargetHint": ("Wskazówka: Naciśnij klawisz (F10) przed NPC, by regulować na żywo", "Naciśnij klawisz (domyślnie: F10) patrząc na kobiecego NPC, aby na żywo regulować ustawienia dla NPC, stroju lub globalne."),
     "TargetHotkey": ("Klawisz regulacji", "Naciśnij patrząc na kobiecego NPC, aby ustawić długość lub wykluczenie dla tej postaci lub stroju."),
     "LearnAdjustPower": ("Moc regulacji (VR / Pad)", "Dodaje moc 'MiniSkirt: Adjust Target' do otwierania menu bez klawiatury."),
 }
@@ -218,6 +234,7 @@ T["RUSSIAN"] = {
     "Flare": ("Угол расклёшенности", "Угол (градусы), под которым юбка расходится к подолу. 0 — прямо вниз; чем больше, тем шире подол."),
     "FlareStart": ("Начало расклёшения (%)", "Высота, с которой юбка начинает расширяться. 0: линия бёдер (по умолчанию) / 100: сразу под талией (вся юбка)."),
     "FlareCurve": ("Ширина в середине", "Дополнительный объём посередине между началом и подолом. 0: прямой А-силуэт / плюс: колокол или баллон / минус: более узкая середина."),
+    "FlareBias": ("Смещение кривой", "Смещает пик изгиба вверх или вниз. 0: по центру / минус: выше / плюс: ниже."),
     "Legs": "Ноги под юбкой",
     "ReplaceLegs": ("Использовать ноги персонажа", "Вкл. (по умолчанию): скрывает ноги одежды и показывает тело персонажа. Отключите для одежды с колготками."),
     "LegTop": ("Верхняя граница ног", "Укороченная юбка показала бы ноги одежды, обрезанные посередине. Поэтому они скрываются, а голые ноги добавляются от щиколоток до этой высоты. 80: чуть ниже тазовых костей (пах и ягодицы видны), 64: чуть ниже паха (не видны)."),
@@ -225,6 +242,7 @@ T["RUSSIAN"] = {
     "Gap": ("Зазор юбка / ноги", "Насколько юбка отстоит от ног. Наружу сдвигаются только слишком близкие места (одежда, юбка которой движется вместе с ягодицами). Увеличьте, если ягодицы проходят насквозь."),
     "GapStiff": ("Зазор (жёсткие юбки)", "Зазор для одежды, юбка которой не движется вместе с ягодицами. Ставьте больше — сквозь них проходит легче."),
     "PerTarget": "Для NPC / Для одежды",
+    "PerTargetHint": ("Совет: Нажмите клавишу (F10) перед NPC для настройки в игре", "Нажмите клавишу (по умолчанию: F10), глядя на женского NPC, чтобы настраивать длину и форму в реальном времени."),
     "TargetHotkey": ("Клавиша настройки", "Нажмите, глядя на женского NPC, чтобы изменить длину или исключение для этого NPC или его одежды."),
     "LearnAdjustPower": ("Способность настройки (VR / Геймпад)", "Добавляет способность 'MiniSkirt: Adjust Target' для открытия меню без клавиатуры."),
 }
@@ -242,6 +260,7 @@ T["CZECH"] = {
     "Flare": ("Úhel rozšíření lemu", "Úhel (stupně), pod kterým se sukně rozšiřuje k lemu. 0 padá rovně dolů; větší hodnoty lem více rozšíří."),
     "FlareStart": ("Začátek rozšíření (%)", "Výška, kde se sukně začne rozšiřovat. 0: linie boků (výchozí) / 100: těsně pod pasem (celá sukně)."),
     "FlareCurve": ("Šířka uprostřed sukně", "Přidaná šířka v polovině mezi začátkem a lemem. 0: rovné A / kladné: zvonový či balónový tvar / záporné: užší střed."),
+    "FlareBias": ("Posun křivky", "Posouvá vrchol křivky nahoru nebo dolů. 0: střed / záporné: výše / kladné: níže."),
     "Legs": "Nohy pod sukní",
     "ReplaceLegs": ("Použít vlastní nohy postavy", "Zapnuto (výchozí): skryje nohy oblečení a zobrazí tělo postavy. Vypněte pro oblečení s punčochami."),
     "LegTop": ("Horní hranice nohou", "Zkrácená sukně by ukázala nohy oblečení useknuté v půli. Proto se skryjí a přidají se nahé nohy od kotníků do této výšky. 80: těsně pod kyčelními kostmi (rozkrok a hýždě vidět), 64: těsně pod rozkrokem (nevidět)."),
@@ -249,6 +268,7 @@ T["CZECH"] = {
     "Gap": ("Mezera sukně / nohy", "Jak daleko sukně zůstává od nohou. Ven se odsunou jen příliš blízká místa (oblečení, jehož sukně se hýbe s hýžděmi). Zvyšte, pokud hýždě prochází."),
     "GapStiff": ("Mezera (tuhé sukně)", "Mezera pro oblečení, jehož sukně se nehýbe s hýžděmi. Nastavte větší, protože se snáze prochází."),
     "PerTarget": "Pro NPC / Pro oblečení",
+    "PerTargetHint": ("Tip: Stiskněte klávesu (F10) před NPC pro živé úpravy", "Stiskněte klávesu (výchozí: F10) při pohledu na ženské NPC pro živou úpravu délky a tvaru pro NPC, oblečení či globálně."),
     "TargetHotkey": ("Klávesa úpravy", "Stiskněte při pohledu na ženské NPC pro nastavení délky nebo vynechání daného NPC či oblečení."),
     "LearnAdjustPower": ("Schopnost úpravy (VR / Ovladač)", "Přidá schopnost 'MiniSkirt: Adjust Target' pro otevření menu bez klávesnice."),
 }
@@ -266,13 +286,15 @@ T["CHINESE"] = {  # 簡体字（中国語の枠はゲームに 1 つだけ。利
     "Flare": ("裙摆张开角度", "从起始位置向裙摆向外张开的角度（度）。0为垂直向下，数值越大裙摆越张开。"),
     "FlareStart": ("张开起始位置（%）", "裙子开始向外张开的高度。0：臀部线（默认）/ 100：腰部正下方（整条裙子张开）。"),
     "FlareCurve": ("中段蓬松度", "起始位置与裙摆正中段的额外蓬松度。0：直线A字裙 / 正值：钟形或花苞蓬松 / 负值：中段收紧、仅裙摆张开。"),
+    "FlareBias": ("曲线高点位置", "移动曲线最饱满（或收紧）的上下位置。0：居中 / 负值：偏上 / 正值：偏下。"),
     "Legs": "裙下的双腿",
     "ReplaceLegs": ("使用角色本人的双腿", "开启（默认）时隐藏服装自带的双腿，显示角色自身身形（CBBE等）的双腿。带有丝袜的服装可关闭此项以保留原服装双腿。"),
     "LegTop": ("添加的双腿上缘", "裙子缩短后，衣服里的双腿会在中途被截断而露出来。因此会隐藏衣服的双腿，改为从脚踝到这个高度添加裸露的双腿。80: 髋骨稍下（能看到胯部和臀部），64: 胯部稍下（看不到）。"),
     "Underwear": ("穿上内衣", "让添加的双腿穿上内衣。会从 NPC 的物品或服装中挑选类似内衣的物品；如果没有，则从已安装的内衣 MOD 中为每个 NPC 选一件（没有内衣 MOD 则保持裸露）。"),
     "Gap": ("裙子与双腿的间隙", "裙子与双腿保持的距离。只把太靠近的部分向外推（裙子会随臀部摆动的服装）。臀部穿出时请调大。"),
     "GapStiff": ("间隙（不会摆动的裙子）", "臀部摆动时裙子不会跟着动的服装所用的间隙。更容易穿出，请设大一些。"),
-    "PerTarget": "单独设置（NPC / 服装）",
+    "PerTarget": "游戏内实时调整（NPC/服装）",
+    "PerTargetHint": ("提示：面对女性NPC按快捷键（默认F10）可实时调整", "面对女性NPC按快捷键（默认F10）即可打开实时调整菜单，按NPC、服装或全局即时调节裙长与裙型。"),
     "TargetHotkey": ("调整目标热键", "面对女性 NPC 按下此键，可单独调整该 NPC 或其服装的裙长和排除设置。设置保存在所有存档通用的文件中。"),
     "LearnAdjustPower": ("习得调整能力（VR / 手柄）", "开启后会获得能力 'MiniSkirt: Adjust Target'，无需键盘即可打开单独设置菜单。"),
 }
@@ -759,6 +781,9 @@ def build_config():
             if "position" in item:
                 h["position"] = item["position"]
             content.append(h)
+            continue
+        if t == "text":
+            content.append({"text": key(item["key"], "Text"), "help": key(item["key"], "Help"), "type": "text"})
             continue
         e = {"id": item["id"], "text": key(item["key"], "Text"), "help": key(item["key"], "Help"), "type": t}
         if t == "toggle":
