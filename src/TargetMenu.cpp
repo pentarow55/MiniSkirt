@@ -576,7 +576,6 @@ namespace TargetMenu
 
 			const auto res = Overrides::Resolve(actor, armor, Probe::GetGlobalDefaults(actor));
 			const auto cutStr = res.hemStyle == 0 ? Tr("$MSK_CutOptRoughText", "Rough") : Tr("$MSK_CutOptLevelText", "Level");
-			const auto uwStr = res.underwear ? Tr("$MSK_MenuOn", "On") : Tr("$MSK_MenuOff", "Off");
 
 			const std::string body = std::format("{}\n{}", Tr("$MSK_MenuMoreTitle", "More Settings"), TargetHeader(actor, armor, a_forNpc));
 
@@ -584,7 +583,7 @@ namespace TargetMenu
 				std::format("{}: {} [{}]", Tr("$MSK_CutStyleText", "Hem Cut Style"), cutStr, SourceLabel(res.hemStyleSource)),
 				std::format("{}: {:.1f} [{}]...", Tr("$MSK_HipEaseText", "Hip Ease"), res.hipEase, SourceLabel(res.hipEaseSource)),
 				std::format("{}: {:.0f}° [{}]...", Tr("$MSK_FlareText", "Flare Angle"), res.flareAngle, SourceLabel(res.flareAngleSource)),
-				std::format("{}: {} [{}]", Tr("$MSK_UnderwearText", "Wear Underwear"), uwStr, SourceLabel(res.underwearSource)),
+				std::format("[{}] {} [{}]", res.underwear ? "x" : " ", Tr("$MSK_UnderwearText", "Wear Underwear"), SourceLabel(res.underwearSource)),
 				std::format("{}: {:.1f} [{}]...", Tr("$MSK_GapText", "Skirt / Leg Gap"), res.skirtGap, SourceLabel(res.skirtGapSource)),
 				std::format("{}: {:.1f} [{}]...", Tr("$MSK_GapStiffText", "Gap (Stiff Skirts)"), res.skirtGapNoBone, SourceLabel(res.skirtGapNoBoneSource)),
 				Tr("$MSK_MenuBtnResetMore", "Reset Detail Settings"),
@@ -757,10 +756,19 @@ namespace TargetMenu
 		auto       armor = a_actor->GetWornArmor(RE::BGSBipedObjectForm::BipedObjectSlot::kBody);
 		const auto armorId = armor ? armor->GetFormID() : 0u;
 
-		const auto res = Overrides::Resolve(a_actor, armor, Probe::GetGlobalDefaults(a_actor));
-
+		const auto gdef = Probe::GetGlobalDefaults(a_actor);
 		const std::string npcName = a_actor->GetDisplayFullName();
 		const std::string armName = armor && armor->GetName() && *armor->GetName() ? armor->GetName() : "(None)";
+
+		// MCM で全体が無効になっている場合は、案内だけ表示して調整項目を出さない
+		if (!gdef.enabled) {
+			const std::string body = std::format("MiniSkirt: {}\n{}: {}\n\n{}", npcName, Tr("$MSK_MenuOutfitLabel", "Outfit"), armName,
+				Tr("$MSK_MenuGlobalDisabled", "MiniSkirt is disabled in MCM. Enable it in MCM to adjust settings."));
+			ShowMenu(body, { Tr("$MSK_MenuBtnClose", "Close") }, {});
+			return;
+		}
+
+		const auto res = Overrides::Resolve(a_actor, armor, gdef);
 		const std::string status = res.enabled ?
 		                               std::format("{} ({:.0f}% [{}])", Tr("$MSK_MenuEnabled", "Enabled"), res.lengthPct, SourceLabel(res.lengthSource)) :
 		                               std::format("{} ([{}])", Tr("$MSK_MenuExcluded", "Excluded"), SourceLabel(res.enabledSource));
@@ -772,54 +780,81 @@ namespace TargetMenu
 		const auto armRule = Overrides::GetOutfitRule(armor);
 		const bool npcExcluded = npcRule && npcRule->enabled.has_value() && !*npcRule->enabled;
 		const bool armExcluded = armRule && armRule->enabled.has_value() && !*armRule->enabled;
+		const bool npcOn = !npcExcluded;
+		const bool armOn = !armExcluded;
 
-		std::vector<std::string> buttons = {
-			Tr("$MSK_MenuBtnNpcLen", "NPC: Adjust Length..."),
-			Tr("$MSK_MenuBtnNpcMore", "NPC: More Settings..."),
-			npcExcluded ? Tr("$MSK_MenuBtnNpcEn", "NPC: Enable (Clear Exclude)") : Tr("$MSK_MenuBtnNpcExcl", "NPC: Exclude (Keep Original)"),
-			Tr("$MSK_MenuBtnOutLen", "Outfit: Adjust Length..."),
-			Tr("$MSK_MenuBtnOutMore", "Outfit: More Settings..."),
-			armExcluded ? Tr("$MSK_MenuBtnOutEn", "Outfit: Enable (Clear Exclude)") : Tr("$MSK_MenuBtnOutExcl", "Outfit: Exclude (Keep Original)"),
-			Tr("$MSK_MenuBtnClearAll", "Clear NPC & Outfit Overrides"),
-			Tr("$MSK_MenuBtnClose", "Close"),
+		enum class Act
+		{
+			kNpcToggle,
+			kNpcLen,
+			kNpcMore,
+			kOutToggle,
+			kOutLen,
+			kOutMore,
+			kClearAll,
+			kClose,
 		};
+		std::vector<std::string> buttons;
+		std::vector<Act>         actions;
 
-		ShowMenu(body, buttons, [actorId, armorId, npcExcluded, armExcluded](std::int32_t a_idx) {
+		buttons.push_back(std::format("[{}] {}", npcOn ? "x" : " ", Tr("$MSK_MenuBtnNpcToggle", "NPC: MiniSkirt")));
+		actions.push_back(Act::kNpcToggle);
+		if (npcOn) {
+			buttons.push_back(Tr("$MSK_MenuBtnNpcLen", "NPC: Adjust Length..."));
+			actions.push_back(Act::kNpcLen);
+			buttons.push_back(Tr("$MSK_MenuBtnNpcMore", "NPC: More Settings..."));
+			actions.push_back(Act::kNpcMore);
+		}
+		if (armor) {
+			buttons.push_back(std::format("[{}] {}", armOn ? "x" : " ", Tr("$MSK_MenuBtnOutToggle", "Outfit: MiniSkirt")));
+			actions.push_back(Act::kOutToggle);
+			if (armOn) {
+				buttons.push_back(Tr("$MSK_MenuBtnOutLen", "Outfit: Adjust Length..."));
+				actions.push_back(Act::kOutLen);
+				buttons.push_back(Tr("$MSK_MenuBtnOutMore", "Outfit: More Settings..."));
+				actions.push_back(Act::kOutMore);
+			}
+		}
+		buttons.push_back(Tr("$MSK_MenuBtnClearAll", "Clear NPC & Outfit Overrides"));
+		actions.push_back(Act::kClearAll);
+		buttons.push_back(Tr("$MSK_MenuBtnClose", "Close"));
+		actions.push_back(Act::kClose);
+
+		ShowMenu(body, buttons, [actorId, armorId, npcOn, armOn, actions](std::int32_t a_idx) {
+			if (a_idx < 0 || static_cast<std::size_t>(a_idx) >= actions.size()) {
+				return;
+			}
 			auto act = RE::TESForm::LookupByID<RE::Actor>(actorId);
 			auto arm = armorId ? RE::TESForm::LookupByID<RE::TESObjectARMO>(armorId) : nullptr;
 			if (!act) {
 				return;
 			}
-			switch (a_idx) {
-			case 0:
+			switch (actions[static_cast<std::size_t>(a_idx)]) {
+			case Act::kNpcToggle:
+				Overrides::SetNpcEnabled(act, npcOn ? std::optional<bool>(false) : std::optional<bool>(true));
+				Probe::ReprocessActorNow(actorId);
+				OpenForActor(act);
+				break;
+			case Act::kNpcLen:
 				OpenLengthSubMenu(actorId, armorId, true);
 				break;
-			case 1:
+			case Act::kNpcMore:
 				OpenDetailSubMenu(actorId, armorId, true);
 				break;
-			case 2:
-				Overrides::SetNpcEnabled(act, npcExcluded ? std::optional<bool>(true) : std::optional<bool>(false));
-				Probe::ReprocessActorNow(actorId);
-				RE::SendHUDMessage::ShowHUDMessage(std::format("MiniSkirt: {} -> {}", act->GetDisplayFullName(),
-					npcExcluded ? Tr("$MSK_MenuEnabled", "Enabled") : Tr("$MSK_MenuExcluded", "Excluded"))
-					                                   .c_str());
+			case Act::kOutToggle:
+				if (arm) {
+					Overrides::SetOutfitEnabled(arm, armOn ? std::optional<bool>(false) : std::optional<bool>(true));
+					Probe::ReprocessByArmorNow(armorId);
+				}
+				OpenForActor(act);
 				break;
-			case 3:
+			case Act::kOutLen:
 				OpenLengthSubMenu(actorId, armorId, false);
 				break;
-			case 4:
+			case Act::kOutMore:
 				OpenDetailSubMenu(actorId, armorId, false);
 				break;
-			case 5:
-				if (arm) {
-					Overrides::SetOutfitEnabled(arm, armExcluded ? std::optional<bool>(true) : std::optional<bool>(false));
-					Probe::ReprocessByArmorNow(armorId);
-					RE::SendHUDMessage::ShowHUDMessage(std::format("MiniSkirt: {} -> {}", arm->GetName(),
-						armExcluded ? Tr("$MSK_MenuEnabled", "Enabled") : Tr("$MSK_MenuExcluded", "Excluded"))
-						                                   .c_str());
-				}
-				break;
-			case 6:
+			case Act::kClearAll:
 				Overrides::ClearNpc(act);
 				if (arm) {
 					Overrides::ClearOutfit(arm);
@@ -828,6 +863,7 @@ namespace TargetMenu
 					Probe::ReprocessActorNow(actorId);
 				}
 				RE::SendHUDMessage::ShowHUDMessage(Tr("$MSK_MenuCleared", "MiniSkirt: Cleared overrides").c_str());
+				OpenForActor(act);
 				break;
 			default:
 				break;
