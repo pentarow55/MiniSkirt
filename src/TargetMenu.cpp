@@ -778,52 +778,61 @@ namespace TargetMenu
 
 		const auto npcRule = Overrides::GetNpcRule(a_actor);
 		const auto armRule = Overrides::GetOutfitRule(armor);
-		const bool npcExcluded = npcRule && npcRule->enabled.has_value() && !*npcRule->enabled;
-		const bool armExcluded = armRule && armRule->enabled.has_value() && !*armRule->enabled;
-		const bool npcOn = !npcExcluded;
-		const bool armOn = !armExcluded;
+		const bool npcOverride = npcRule.has_value();
+		const bool armOverride = armRule.has_value();
+		const bool npcApply = npcOverride ? (!npcRule->enabled.has_value() || *npcRule->enabled) : res.enabled;
+		const bool armApply = armOverride ? (!armRule->enabled.has_value() || *armRule->enabled) : true;
 
 		enum class Act
 		{
-			kNpcToggle,
+			kNpcOverride,
+			kNpcApply,
 			kNpcLen,
 			kNpcMore,
-			kOutToggle,
+			kOutOverride,
+			kOutApply,
 			kOutLen,
 			kOutMore,
-			kClearAll,
 			kClose,
 		};
 		std::vector<std::string> buttons;
 		std::vector<Act>         actions;
 
+		const std::string applyLabel = Tr("$MSK_MenuBtnApply", "Apply MiniSkirt");
 		const std::string subLen = std::format("    - {}", Tr("$MSK_MenuBtnSubLen", "Adjust Length..."));
 		const std::string subMore = std::format("    - {}", Tr("$MSK_MenuBtnSubMore", "More Settings..."));
 
-		buttons.push_back(std::format("[{}] {}", npcOn ? "x" : " ", Tr("$MSK_MenuBtnNpcToggle", "Enable for this NPC")));
-		actions.push_back(Act::kNpcToggle);
-		if (npcOn) {
-			buttons.push_back(subLen);
-			actions.push_back(Act::kNpcLen);
-			buttons.push_back(subMore);
-			actions.push_back(Act::kNpcMore);
-		}
-		if (armor) {
-			buttons.push_back(std::format("[{}] {}", armOn ? "x" : " ", Tr("$MSK_MenuBtnOutToggle", "Enable for this Outfit")));
-			actions.push_back(Act::kOutToggle);
-			if (armOn) {
+		buttons.push_back(std::format("[{}] {}", npcOverride ? "x" : " ", Tr("$MSK_MenuBtnNpcOverride", "Override for this NPC")));
+		actions.push_back(Act::kNpcOverride);
+		if (npcOverride) {
+			buttons.push_back(std::format("    - [{}] {}", npcApply ? "x" : " ", applyLabel));
+			actions.push_back(Act::kNpcApply);
+			if (npcApply) {
 				buttons.push_back(subLen);
-				actions.push_back(Act::kOutLen);
+				actions.push_back(Act::kNpcLen);
 				buttons.push_back(subMore);
-				actions.push_back(Act::kOutMore);
+				actions.push_back(Act::kNpcMore);
 			}
 		}
-		buttons.push_back(Tr("$MSK_MenuBtnClearAll", "Clear NPC & Outfit Overrides"));
-		actions.push_back(Act::kClearAll);
+		if (armor) {
+			buttons.push_back(std::format("[{}] {}", armOverride ? "x" : " ", Tr("$MSK_MenuBtnOutOverride", "Override for this Outfit")));
+			actions.push_back(Act::kOutOverride);
+			if (armOverride) {
+				buttons.push_back(std::format("    - [{}] {}", armApply ? "x" : " ", applyLabel));
+				actions.push_back(Act::kOutApply);
+				if (armApply) {
+					buttons.push_back(subLen);
+					actions.push_back(Act::kOutLen);
+					buttons.push_back(subMore);
+					actions.push_back(Act::kOutMore);
+				}
+			}
+		}
 		buttons.push_back(Tr("$MSK_MenuBtnClose", "Close"));
 		actions.push_back(Act::kClose);
 
-		ShowMenu(body, buttons, [actorId, armorId, npcOn, armOn, actions](std::int32_t a_idx) {
+		const bool curEffective = res.enabled;
+		ShowMenu(body, buttons, [actorId, armorId, npcOverride, armOverride, npcApply, armApply, curEffective, actions](std::int32_t a_idx) {
 			if (a_idx < 0 || static_cast<std::size_t>(a_idx) >= actions.size()) {
 				return;
 			}
@@ -833,8 +842,17 @@ namespace TargetMenu
 				return;
 			}
 			switch (actions[static_cast<std::size_t>(a_idx)]) {
-			case Act::kNpcToggle:
-				Overrides::SetNpcEnabled(act, npcOn ? std::optional<bool>(false) : std::optional<bool>(true));
+			case Act::kNpcOverride:
+				if (npcOverride) {
+					Overrides::ClearNpc(act);
+					Probe::ReprocessActorNow(actorId);
+				} else {
+					Overrides::SetNpcEnabled(act, curEffective);
+				}
+				OpenForActor(act);
+				break;
+			case Act::kNpcApply:
+				Overrides::SetNpcEnabled(act, !npcApply);
 				Probe::ReprocessActorNow(actorId);
 				OpenForActor(act);
 				break;
@@ -844,9 +862,20 @@ namespace TargetMenu
 			case Act::kNpcMore:
 				OpenDetailSubMenu(actorId, armorId, true);
 				break;
-			case Act::kOutToggle:
+			case Act::kOutOverride:
 				if (arm) {
-					Overrides::SetOutfitEnabled(arm, armOn ? std::optional<bool>(false) : std::optional<bool>(true));
+					if (armOverride) {
+						Overrides::ClearOutfit(arm);
+						Probe::ReprocessByArmorNow(armorId);
+					} else {
+						Overrides::SetOutfitEnabled(arm, true);
+					}
+				}
+				OpenForActor(act);
+				break;
+			case Act::kOutApply:
+				if (arm) {
+					Overrides::SetOutfitEnabled(arm, !armApply);
 					Probe::ReprocessByArmorNow(armorId);
 				}
 				OpenForActor(act);
@@ -856,17 +885,6 @@ namespace TargetMenu
 				break;
 			case Act::kOutMore:
 				OpenDetailSubMenu(actorId, armorId, false);
-				break;
-			case Act::kClearAll:
-				Overrides::ClearNpc(act);
-				if (arm) {
-					Overrides::ClearOutfit(arm);
-					Probe::ReprocessByArmorNow(armorId);
-				} else {
-					Probe::ReprocessActorNow(actorId);
-				}
-				RE::SendHUDMessage::ShowHUDMessage(Tr("$MSK_MenuCleared", "MiniSkirt: Cleared overrides").c_str());
-				OpenForActor(act);
 				break;
 			default:
 				break;
