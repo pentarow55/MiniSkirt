@@ -134,11 +134,11 @@ namespace Probe
 				} else if (key == "hip_ease") {
 					g_cfg.hipEase = (std::max)(0.0f, F(val));
 				} else if (key == "flare_angle") {
-					g_cfg.flareAngle = (std::clamp)(F(val), 0.0f, 45.0f);
+					g_cfg.flareAngle = (std::clamp)(F(val), 0.0f, 20.0f);
 				} else if (key == "flare_start") {
-					g_cfg.flareStart = (std::clamp)(F(val), 0.0f, 100.0f);
+					g_cfg.flareStart = (std::clamp)(F(val), -50.0f, 50.0f);
 				} else if (key == "flare_curve") {
-					g_cfg.flareCurve = (std::clamp)(F(val), -10.0f, 20.0f);
+					g_cfg.flareCurve = (std::clamp)(F(val), -10.0f, 15.0f);
 				} else if (key == "remap_weights") {
 					g_cfg.remapWeights = B(val);
 				} else if (key == "band_top") {
@@ -176,11 +176,11 @@ namespace Probe
 				} else if (key == "fHipEase") {
 					g_cfg.hipEase = (std::max)(0.0f, F(val));
 				} else if (key == "fFlareAngle") {
-					g_cfg.flareAngle = (std::clamp)(F(val), 0.0f, 45.0f);
+					g_cfg.flareAngle = (std::clamp)(F(val), 0.0f, 20.0f);
 				} else if (key == "fFlareStart") {
-					g_cfg.flareStart = (std::clamp)(F(val), 0.0f, 100.0f);
+					g_cfg.flareStart = (std::clamp)(F(val), -50.0f, 50.0f);
 				} else if (key == "fFlareCurve") {
-					g_cfg.flareCurve = (std::clamp)(F(val), -10.0f, 20.0f);
+					g_cfg.flareCurve = (std::clamp)(F(val), -10.0f, 15.0f);
 				} else if (key == "fBandTop") {
 					g_cfg.bandTop = F(val);
 				} else if (key == "fSkirtGap") {

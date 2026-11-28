@@ -459,11 +459,7 @@ namespace TargetMenu
 					applyLen(std::nullopt);
 					OpenLengthSubMenu(a_actorId, a_armorId, a_scope);
 				} else {
-					if (a_scope == Scope::kGlobal) {
-						OpenGlobalMenu(a_actorId);
-					} else if (act) {
-						OpenForActor(act);
-					}
+					OpenFlareSubMenu(a_actorId, a_armorId, a_scope);
 				}
 			});
 		}
@@ -508,36 +504,33 @@ namespace TargetMenu
 				bigStep = 1.0f;
 				break;
 			case FloatField::kFlareAngle:
-				title = Tr("$MSK_FlareText", "Hem Flare");
+				title = Tr("$MSK_FlareText", "Hem width");
 				iniKey = "fFlareAngle";
 				curVal = res.flareAngle;
 				src = res.flareAngleSource;
 				minV = 0.0f;
-				maxV = 30.0f;
-				smallStep = 1.0f;
-				bigStep = 5.0f;
-				unit = "°";
-				isInt = true;
+				maxV = 20.0f;
+				smallStep = 0.5f;
+				bigStep = 2.0f;
 				break;
 			case FloatField::kFlareStart:
-				title = Tr("$MSK_FlareStartText", "Flare Start");
+				title = Tr("$MSK_FlareStartText", "Curve bias");
 				iniKey = "fFlareStart";
 				curVal = res.flareStart;
 				src = res.flareStartSource;
-				minV = 0.0f;
-				maxV = 100.0f;
+				minV = -50.0f;
+				maxV = 50.0f;
 				smallStep = 5.0f;
-				bigStep = 20.0f;
-				unit = "%";
+				bigStep = 15.0f;
 				isInt = true;
 				break;
 			case FloatField::kFlareCurve:
-				title = Tr("$MSK_FlareCurveText", "Mid Flare");
+				title = Tr("$MSK_FlareCurveText", "Mid fullness");
 				iniKey = "fFlareCurve";
 				curVal = res.flareCurve;
 				src = res.flareCurveSource;
 				minV = -10.0f;
-				maxV = 20.0f;
+				maxV = 15.0f;
 				smallStep = 0.5f;
 				bigStep = 2.0f;
 				break;
@@ -662,9 +655,10 @@ namespace TargetMenu
 
 			enum class SAct
 			{
+				kLen,
 				kFlare,
-				kFlareStart,
 				kFlareCurve,
+				kFlareStart,
 				kHip,
 				kReset,
 				kBack,
@@ -672,17 +666,19 @@ namespace TargetMenu
 			std::vector<std::string> buttons;
 			std::vector<SAct>        actions;
 
-			buttons.push_back(std::format("{}: {:.0f}° ({})...", Tr("$MSK_FlareText", "Hem flare angle"), res.flareAngle, SourceLabel(res.flareAngleSource)));
+			buttons.push_back(std::format("{}: {:.0f}% ({})...", Tr("$MSK_MenuLenLabel", "Length"), res.lengthPct, SourceLabel(res.lengthSource)));
+			actions.push_back(SAct::kLen);
+			buttons.push_back(std::format("{}: {:.1f} ({})...", Tr("$MSK_FlareText", "Hem width"), res.flareAngle, SourceLabel(res.flareAngleSource)));
 			actions.push_back(SAct::kFlare);
-			buttons.push_back(std::format("{}: {:.0f}% ({})...", Tr("$MSK_FlareStartText", "Flare start height (%)"), res.flareStart, SourceLabel(res.flareStartSource)));
-			actions.push_back(SAct::kFlareStart);
-			buttons.push_back(std::format("{}: {:.1f} ({})...", Tr("$MSK_FlareCurveText", "Mid-skirt flare"), res.flareCurve, SourceLabel(res.flareCurveSource)));
+			buttons.push_back(std::format("{}: {:.1f} ({})...", Tr("$MSK_FlareCurveText", "Mid fullness"), res.flareCurve, SourceLabel(res.flareCurveSource)));
 			actions.push_back(SAct::kFlareCurve);
+			buttons.push_back(std::format("{}: {:.0f} ({})...", Tr("$MSK_FlareStartText", "Curve bias"), res.flareStart, SourceLabel(res.flareStartSource)));
+			actions.push_back(SAct::kFlareStart);
 			buttons.push_back(std::format("{}: {:.1f} ({})...", Tr("$MSK_HipEaseText", "Room around the hips"), res.hipEase, SourceLabel(res.hipEaseSource)));
 			actions.push_back(SAct::kHip);
 
 			if (a_scope != Scope::kGlobal) {
-				buttons.push_back(Tr("$MSK_MenuBtnResetShape", "Reset Shape Settings"));
+				buttons.push_back(Tr("$MSK_MenuBtnResetShape", "Reset Skirt Settings"));
 				actions.push_back(SAct::kReset);
 			}
 			buttons.push_back(Tr("$MSK_MenuBtnBack", "Back"));
@@ -695,6 +691,9 @@ namespace TargetMenu
 				auto act = a_actorId ? RE::TESForm::LookupByID<RE::Actor>(a_actorId) : nullptr;
 				auto arm = a_armorId ? RE::TESForm::LookupByID<RE::TESObjectARMO>(a_armorId) : nullptr;
 				switch (actions[static_cast<std::size_t>(a_idx)]) {
+				case SAct::kLen:
+					OpenLengthSubMenu(a_actorId, a_armorId, a_scope);
+					break;
 				case SAct::kFlare:
 					OpenFloatSubMenu(a_actorId, a_armorId, a_scope, FloatField::kFlareAngle);
 					break;
@@ -709,6 +708,7 @@ namespace TargetMenu
 					break;
 				case SAct::kReset: {
 					auto fn = [](Overrides::Rule& r) {
+						r.lengthPct.reset();
 						r.hipEase.reset();
 						r.flareAngle.reset();
 						r.flareStart.reset();
@@ -922,7 +922,6 @@ namespace TargetMenu
 
 			enum class GAct
 			{
-				kLen,
 				kShape,
 				kMore,
 				kExit,
@@ -931,9 +930,7 @@ namespace TargetMenu
 			std::vector<GAct>        actions;
 
 			if (gdef.enabled) {
-				buttons.push_back(Tr("$MSK_MenuBtnSubLen", "Adjust Length..."));
-				actions.push_back(GAct::kLen);
-				buttons.push_back(Tr("$MSK_MenuBtnSubShape", "Adjust Skirt Shape..."));
+				buttons.push_back(Tr("$MSK_MenuBtnSubShape", "Adjust Skirt..."));
 				actions.push_back(GAct::kShape);
 			}
 			buttons.push_back(Tr("$MSK_MenuBtnSubMore", "More Settings..."));
@@ -946,9 +943,6 @@ namespace TargetMenu
 					return;
 				}
 				switch (actions[static_cast<std::size_t>(a_idx)]) {
-				case GAct::kLen:
-					OpenLengthSubMenu(a_returnActorId, 0, Scope::kGlobal);
-					break;
 				case GAct::kShape:
 					OpenFlareSubMenu(a_returnActorId, 0, Scope::kGlobal);
 					break;
@@ -1102,11 +1096,9 @@ namespace TargetMenu
 		{
 			kGlobal,
 			kOutOverride,
-			kOutLen,
 			kOutShape,
 			kOutMore,
 			kNpcOverride,
-			kNpcLen,
 			kNpcShape,
 			kNpcMore,
 			kClose,
@@ -1114,8 +1106,7 @@ namespace TargetMenu
 		std::vector<std::string> buttons;
 		std::vector<Act>         actions;
 
-		const std::string subLen = std::format("    - {}", Tr("$MSK_MenuBtnSubLen", "Adjust Length..."));
-		const std::string subShape = std::format("    - {}", Tr("$MSK_MenuBtnSubShape", "Adjust Skirt Shape..."));
+		const std::string subShape = std::format("    - {}", Tr("$MSK_MenuBtnSubShape", "Adjust Skirt..."));
 		const std::string subMore = std::format("    - {}", Tr("$MSK_MenuBtnSubMore", "More Settings..."));
 
 		// 広い範囲 → 狭い範囲の順（全体 → この衣装 → この NPC）
@@ -1127,8 +1118,6 @@ namespace TargetMenu
 			actions.push_back(Act::kOutOverride);
 			if (armOverride) {
 				if (armApply) {
-					buttons.push_back(subLen);
-					actions.push_back(Act::kOutLen);
 					buttons.push_back(subShape);
 					actions.push_back(Act::kOutShape);
 				}
@@ -1141,8 +1130,6 @@ namespace TargetMenu
 		actions.push_back(Act::kNpcOverride);
 		if (npcOverride) {
 			if (npcApply) {
-				buttons.push_back(subLen);
-				actions.push_back(Act::kNpcLen);
 				buttons.push_back(subShape);
 				actions.push_back(Act::kNpcShape);
 			}
@@ -1178,9 +1165,6 @@ namespace TargetMenu
 				}
 				OpenForActor(act);
 				break;
-			case Act::kOutLen:
-				OpenLengthSubMenu(actorId, armorId, Scope::kOutfit);
-				break;
 			case Act::kOutShape:
 				OpenFlareSubMenu(actorId, armorId, Scope::kOutfit);
 				break;
@@ -1195,9 +1179,6 @@ namespace TargetMenu
 					Overrides::SetNpcEnabled(act, curEffective);
 				}
 				OpenForActor(act);
-				break;
-			case Act::kNpcLen:
-				OpenLengthSubMenu(actorId, armorId, Scope::kNpc);
 				break;
 			case Act::kNpcShape:
 				OpenFlareSubMenu(actorId, armorId, Scope::kNpc);
