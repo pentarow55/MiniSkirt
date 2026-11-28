@@ -52,12 +52,13 @@ namespace Probe
 			bool  twoSided{ true };        // スカートの shape を両面描画にする（裏側の布が見えるように）
 			bool  cutCloth{ true };        // 裾より下の布を縮めず切る（縮めると布が腰に溜まり、覗くと黒い塊になる）
 			int   hemStyle{ 1 };           // 裾の切り方: 0 = ラフ / 1 = 水平（既定）
-			int   targetHotkey{ 66 };      // 目の前の NPC の個別設定メニューを開くキー（DXScanCode。既定 66 = F8、0 で無効）
+			int   targetHotkey{ 68 };      // 目の前の NPC の個別設定メニューを開くキー（DXScanCode。既定 68 = F10、0 で無効）
 			bool  learnAdjustPower{ false };  // VR・パッド向けの調整パワーを習得する
 		};
 		Cfg g_cfg;
 		float g_curLengthPct{ 24.0f };  // 現在処理中の NPC に適用するスカート丈（%）
 		float g_curHem{ 65.0f };        // 現在処理中の NPC に適用するすその高さ
+		int   g_curHemStyle{ 1 };       // 現在処理中の NPC に適用する裾の切り方
 
 		std::string Trim(std::string a_s)
 		{
@@ -568,7 +569,7 @@ namespace Probe
 					hemNew = res.hemZ;
 				} else if (g_cfg.cutCloth) {
 					// 縮めず、裾より下の布を切る（重みは動かさないので写し替えも要らない）。CPU 側の頂点は CutCloth が直接書く
-					hemNew = Band::CutCloth(a_geo, buf, g_curHem, sleeve, ent.dead, g_cfg.hemStyle);
+					hemNew = Band::CutCloth(a_geo, buf, g_curHem, sleeve, ent.dead, g_curHemStyle);
 					pos.clear();
 				} else {
 					const auto pos0 = pos;
@@ -755,6 +756,12 @@ namespace Probe
 			std::uint64_t                 token{ 0 };
 			float                         lengthPct{ 30.0f };
 			float                         hem{ 56.4f };
+			int                           hemStyle{ 1 };
+			float                         hipEase{ 1.0f };
+			float                         flareAngle{ 5.0f };
+			bool                          underwear{ true };
+			float                         skirtGap{ 1.0f };
+			float                         skirtGapNoBone{ 1.0f };
 			long long                     us[4]{};
 		};
 		std::uint64_t g_jobToken = 0;  // 処理を始めるたびに増やす。途中の段は、自分の番号と違えば（別の処理が割り込んだ）やめる
@@ -803,7 +810,17 @@ namespace Probe
 				return false;
 			}
 			// 個別設定（優先順位: NPC 個別 > 衣装別 > 全体設定）を解決
-			const auto resolved = Overrides::Resolve(actor, armor, g_cfg.enabled, g_cfg.excludeElderly && IsElderly(actor), g_cfg.lengthPct);
+			Overrides::GlobalDefaults gdef;
+			gdef.enabled = g_cfg.enabled;
+			gdef.elderlyExcluded = g_cfg.excludeElderly && IsElderly(actor);
+			gdef.lengthPct = g_cfg.lengthPct;
+			gdef.hemStyle = g_cfg.hemStyle;
+			gdef.hipEase = g_cfg.hipEase;
+			gdef.flareAngle = g_cfg.flareAngle;
+			gdef.underwear = g_cfg.underwear;
+			gdef.skirtGap = g_cfg.skirtGap;
+			gdef.skirtGapNoBone = g_cfg.skirtGapNoBone;
+			const auto resolved = Overrides::Resolve(actor, armor, gdef);
 			if (!resolved.enabled) {
 				g_seen.insert(a_id);
 				RestoreActor(actor);
@@ -837,8 +854,15 @@ namespace Probe
 			}
 			a_job.lengthPct = resolved.lengthPct;
 			a_job.hem = HemFromLength(resolved.lengthPct);
+			a_job.hemStyle = resolved.hemStyle;
+			a_job.hipEase = resolved.hipEase;
+			a_job.flareAngle = resolved.flareAngle;
+			a_job.underwear = resolved.underwear;
+			a_job.skirtGap = resolved.skirtGap;
+			a_job.skirtGapNoBone = resolved.skirtGapNoBone;
 			g_curLengthPct = a_job.lengthPct;
 			g_curHem = a_job.hem;
+			g_curHemStyle = a_job.hemStyle;
 			// 3D が作り直されて、書き換え済みの頂点が写されていないか調べ、あれば元に戻す（脚が消えたままになるのを防ぐ）
 			RefreshOutfit(obj.partClone.get(), who, a_id);
 			// 1 回目: 判定だけ（スカートがあるか）
@@ -860,7 +884,7 @@ namespace Probe
 					// 切られた頂点が残っている（元に戻せず、切り済みのまま判定できなかった）。縮めた服のままなので、帯は外さない。
 					// 3D が作り直されて帯が外れていれば付け直す（付けないと、短いスカートの下に脚が無いままになる）
 					std::string underwear;
-					if (g_cfg.underwear) {
+					if (a_job.underwear) {
 						underwear = Underwear::Find(actor, armor, static_cast<int>(std::lround(g_cfg.bandTop))).path;
 					}
 					const bool ok = Band::Attach(actor, underwear);
@@ -876,7 +900,7 @@ namespace Probe
 			// 帯（足首〜上端の裸の体）を先に用意する。用意できなければ縮めない（縮めると脚が消えるので、ロングのままにする）
 			// スカートの中に着ける下着（所持品・服装・ランダム）。無効なら裸の体だけ
 			std::string underwear;
-			if (g_cfg.underwear && !DevFlags::On(DevFlags::kNoUnderwear)) {
+			if (a_job.underwear && !DevFlags::On(DevFlags::kNoUnderwear)) {
 				underwear = Underwear::Find(actor, armor, static_cast<int>(std::lround(g_cfg.bandTop))).path;
 			}
 			if (!DevFlags::On(DevFlags::kNoBand)) {
@@ -923,6 +947,7 @@ namespace Probe
 			const auto t0 = std::chrono::steady_clock::now();
 			g_curLengthPct = a_job.lengthPct;
 			g_curHem = a_job.hem;
+			g_curHemStyle = a_job.hemStyle;
 			if (a_k == 1) {
 				g_shortened = false;
 				g_skirts.clear();
@@ -933,9 +958,9 @@ namespace Probe
 			} else if (a_k == 2) {
 				// 鎧は重なった板の間隔を保って広げる（比で縮尺すると板が同じ半径に潰れて背中に穴が空いた）。
 				// 切ったスカートが無ければ（丈 100% など）A ラインにはせず、差し替えた脚の腰に当たる所だけ外へ出す（形は元のまま）
-				Band::ShapeSkirt(actor, g_skirts, g_cfg.waist, g_hemNew < 1e8f ? g_hemNew : g_curHem, g_cfg.hipEase, g_cfg.flareAngle, g_armorMode, !g_anyCut);
+				Band::ShapeSkirt(actor, g_skirts, g_cfg.waist, g_hemNew < 1e8f ? g_hemNew : g_curHem, a_job.hipEase, a_job.flareAngle, g_armorMode, !g_anyCut);
 			} else {
-				Band::FitSkirt(actor, g_skirts, g_hemNew < 1e8f ? g_hemNew : g_curHem, g_cfg.skirtGap, g_cfg.skirtGapNoBone, g_cfg.bodyWeights);
+				Band::FitSkirt(actor, g_skirts, g_hemNew < 1e8f ? g_hemNew : g_curHem, a_job.skirtGap, a_job.skirtGapNoBone, g_cfg.bodyWeights);
 				g_skirtActors.insert(a_job.id);
 			}
 			a_job.us[a_k] = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t0).count();
@@ -1443,10 +1468,20 @@ namespace Probe
 	}
 
 	int TargetHotkey() { return g_cfg.targetHotkey; }
-	bool GlobalEnabled() { return g_cfg.enabled; }
-	bool GlobalExcludeElderly() { return g_cfg.excludeElderly; }
-	float GlobalLengthPct() { return g_cfg.lengthPct; }
-	bool IsActorElderly(RE::Actor* a_actor) { return IsElderly(a_actor); }
+	Overrides::GlobalDefaults GetGlobalDefaults(RE::Actor* a_actor)
+	{
+		Overrides::GlobalDefaults gdef;
+		gdef.enabled = g_cfg.enabled;
+		gdef.elderlyExcluded = g_cfg.excludeElderly && IsElderly(a_actor);
+		gdef.lengthPct = g_cfg.lengthPct;
+		gdef.hemStyle = g_cfg.hemStyle;
+		gdef.hipEase = g_cfg.hipEase;
+		gdef.flareAngle = g_cfg.flareAngle;
+		gdef.underwear = g_cfg.underwear;
+		gdef.skirtGap = g_cfg.skirtGap;
+		gdef.skirtGapNoBone = g_cfg.skirtGapNoBone;
+		return gdef;
+	}
 
 	void ReprocessActorNow(RE::FormID a_id)
 	{

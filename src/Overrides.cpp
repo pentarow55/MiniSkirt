@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -21,6 +22,30 @@ namespace Overrides
 		std::mutex                  g_mutex;
 		std::map<std::string, Rule> g_npcs;
 		std::map<std::string, Rule> g_outfits;
+
+		float Round1(float a_v) { return std::round(a_v * 10.0f) / 10.0f; }
+
+		void ClampRule(Rule& a_r)
+		{
+			if (a_r.lengthPct.has_value()) {
+				a_r.lengthPct = Round1(std::clamp(*a_r.lengthPct, kMinLength, kMaxLength));
+			}
+			if (a_r.hemStyle.has_value()) {
+				a_r.hemStyle = std::clamp(*a_r.hemStyle, 0, 1);
+			}
+			if (a_r.hipEase.has_value()) {
+				a_r.hipEase = Round1(std::clamp(*a_r.hipEase, 0.0f, 8.0f));
+			}
+			if (a_r.flareAngle.has_value()) {
+				a_r.flareAngle = Round1(std::clamp(*a_r.flareAngle, 0.0f, 30.0f));
+			}
+			if (a_r.skirtGap.has_value()) {
+				a_r.skirtGap = Round1(std::clamp(*a_r.skirtGap, 0.0f, 8.0f));
+			}
+			if (a_r.skirtGapNoBone.has_value()) {
+				a_r.skirtGapNoBone = Round1(std::clamp(*a_r.skirtGapNoBone, 0.0f, 10.0f));
+			}
+		}
 
 		std::string NpcKey(RE::Actor* a_actor)
 		{
@@ -64,16 +89,36 @@ namespace Overrides
 				if (!it.value().is_object()) {
 					continue;
 				}
-				Rule r;
-				if (auto n = it.value().find("name"); n != it.value().end() && n->is_string()) {
+				const auto& v = it.value();
+				Rule        r;
+				if (auto n = v.find("name"); n != v.end() && n->is_string()) {
 					r.name = n->get<std::string>();
 				}
-				if (auto e = it.value().find("enabled"); e != it.value().end() && e->is_boolean()) {
+				if (auto e = v.find("enabled"); e != v.end() && e->is_boolean()) {
 					r.enabled = e->get<bool>();
 				}
-				if (auto l = it.value().find("length"); l != it.value().end() && l->is_number()) {
-					r.lengthPct = std::clamp(l->get<float>(), kMinLength, kMaxLength);
+				if (auto l = v.find("length"); l != v.end() && l->is_number()) {
+					r.lengthPct = l->get<float>();
 				}
+				if (auto h = v.find("hemStyle"); h != v.end() && h->is_number_integer()) {
+					r.hemStyle = h->get<int>();
+				}
+				if (auto he = v.find("hipEase"); he != v.end() && he->is_number()) {
+					r.hipEase = he->get<float>();
+				}
+				if (auto fa = v.find("flareAngle"); fa != v.end() && fa->is_number()) {
+					r.flareAngle = fa->get<float>();
+				}
+				if (auto uw = v.find("underwear"); uw != v.end() && uw->is_boolean()) {
+					r.underwear = uw->get<bool>();
+				}
+				if (auto sg = v.find("skirtGap"); sg != v.end() && sg->is_number()) {
+					r.skirtGap = sg->get<float>();
+				}
+				if (auto sgn = v.find("skirtGapNoBone"); sgn != v.end() && sgn->is_number()) {
+					r.skirtGapNoBone = sgn->get<float>();
+				}
+				ClampRule(r);
 				if (!r.empty()) {
 					a_out[it.key()] = std::move(r);
 				}
@@ -95,7 +140,25 @@ namespace Overrides
 					item["enabled"] = *r.enabled;
 				}
 				if (r.lengthPct.has_value()) {
-					item["length"] = std::round(*r.lengthPct * 10.0f) / 10.0f;
+					item["length"] = Round1(*r.lengthPct);
+				}
+				if (r.hemStyle.has_value()) {
+					item["hemStyle"] = *r.hemStyle;
+				}
+				if (r.hipEase.has_value()) {
+					item["hipEase"] = Round1(*r.hipEase);
+				}
+				if (r.flareAngle.has_value()) {
+					item["flareAngle"] = Round1(*r.flareAngle);
+				}
+				if (r.underwear.has_value()) {
+					item["underwear"] = *r.underwear;
+				}
+				if (r.skirtGap.has_value()) {
+					item["skirtGap"] = Round1(*r.skirtGap);
+				}
+				if (r.skirtGapNoBone.has_value()) {
+					item["skirtGapNoBone"] = Round1(*r.skirtGapNoBone);
 				}
 				obj[k] = std::move(item);
 			}
@@ -125,6 +188,42 @@ namespace Overrides
 			} catch (const std::exception& e) {
 				logger::warn("Overrides: 保存に失敗: {}", e.what());
 				return false;
+			}
+		}
+
+		void ApplyRule(const Rule& a_r, Source a_src, Resolved& a_out)
+		{
+			if (a_r.enabled.has_value()) {
+				a_out.enabled = *a_r.enabled;
+				a_out.enabledSource = a_src;
+			}
+			if (a_r.lengthPct.has_value()) {
+				a_out.lengthPct = *a_r.lengthPct;
+				a_out.lengthSource = a_src;
+			}
+			if (a_r.hemStyle.has_value()) {
+				a_out.hemStyle = *a_r.hemStyle;
+				a_out.hemStyleSource = a_src;
+			}
+			if (a_r.hipEase.has_value()) {
+				a_out.hipEase = *a_r.hipEase;
+				a_out.hipEaseSource = a_src;
+			}
+			if (a_r.flareAngle.has_value()) {
+				a_out.flareAngle = *a_r.flareAngle;
+				a_out.flareAngleSource = a_src;
+			}
+			if (a_r.underwear.has_value()) {
+				a_out.underwear = *a_r.underwear;
+				a_out.underwearSource = a_src;
+			}
+			if (a_r.skirtGap.has_value()) {
+				a_out.skirtGap = *a_r.skirtGap;
+				a_out.skirtGapSource = a_src;
+			}
+			if (a_r.skirtGapNoBone.has_value()) {
+				a_out.skirtGapNoBone = *a_r.skirtGapNoBone;
+				a_out.skirtGapNoBoneSource = a_src;
 			}
 		}
 	}
@@ -172,45 +271,33 @@ namespace Overrides
 		return SaveUnlocked();
 	}
 
-	Resolved Resolve(RE::Actor* a_actor, RE::TESObjectARMO* a_armor, bool a_globalEnabled, bool a_elderlyExcluded, float a_globalLengthPct)
+	Resolved Resolve(RE::Actor* a_actor, RE::TESObjectARMO* a_armor, const GlobalDefaults& a_global)
 	{
 		Resolved out;
-		out.enabled = a_globalEnabled && !a_elderlyExcluded;
-		out.lengthPct = std::clamp(a_globalLengthPct, kMinLength, kMaxLength);
-		out.enabledSource = Source::kGlobal;
-		out.lengthSource = Source::kGlobal;
+		out.enabled = a_global.enabled && !a_global.elderlyExcluded;
+		out.lengthPct = std::clamp(a_global.lengthPct, kMinLength, kMaxLength);
+		out.hemStyle = std::clamp(a_global.hemStyle, 0, 1);
+		out.hipEase = std::clamp(a_global.hipEase, 0.0f, 8.0f);
+		out.flareAngle = std::clamp(a_global.flareAngle, 0.0f, 30.0f);
+		out.underwear = a_global.underwear;
+		out.skirtGap = std::clamp(a_global.skirtGap, 0.0f, 8.0f);
+		out.skirtGapNoBone = std::clamp(a_global.skirtGapNoBone, 0.0f, 10.0f);
 
 		const auto npcKey = NpcKey(a_actor);
 		const auto outfitKey = FormKey(a_armor);
 
 		std::lock_guard l(g_mutex);
 
-		// 衣装別（中優先度）
 		if (!outfitKey.empty()) {
 			if (auto it = g_outfits.find(outfitKey); it != g_outfits.end()) {
-				if (it->second.enabled.has_value()) {
-					out.enabled = *it->second.enabled;
-					out.enabledSource = Source::kOutfit;
-				}
-				if (it->second.lengthPct.has_value()) {
-					out.lengthPct = *it->second.lengthPct;
-					out.lengthSource = Source::kOutfit;
-				}
+				ApplyRule(it->second, Source::kOutfit, out);
 			}
 		}
 
-		// NPC 個別（最高優先度）
 		if (!npcKey.empty()) {
 			if (auto it = g_npcs.find(npcKey); it != g_npcs.end()) {
 				out.hasNpcRule = true;
-				if (it->second.enabled.has_value()) {
-					out.enabled = *it->second.enabled;
-					out.enabledSource = Source::kNpc;
-				}
-				if (it->second.lengthPct.has_value()) {
-					out.lengthPct = *it->second.lengthPct;
-					out.lengthSource = Source::kNpc;
-				}
+				ApplyRule(it->second, Source::kNpc, out);
 			}
 		}
 
@@ -243,44 +330,57 @@ namespace Overrides
 		return std::nullopt;
 	}
 
-	void SetNpcLength(RE::Actor* a_actor, std::optional<float> a_lengthPct)
+	void UpdateNpc(RE::Actor* a_actor, const std::function<void(Rule&)>& a_fn)
 	{
 		const auto key = NpcKey(a_actor);
-		if (key.empty()) {
+		if (key.empty() || !a_fn) {
 			return;
 		}
 		std::lock_guard l(g_mutex);
 		auto&           r = g_npcs[key];
 		r.name = NpcName(a_actor);
-		if (a_lengthPct.has_value()) {
-			r.lengthPct = std::clamp(*a_lengthPct, kMinLength, kMaxLength);
-			// 丈を明示設定したら、除外中だった場合は解除して有効にする
-			if (r.enabled.has_value() && !*r.enabled) {
-				r.enabled = true;
-			}
-		} else {
-			r.lengthPct.reset();
-		}
+		a_fn(r);
+		ClampRule(r);
 		if (r.empty()) {
 			g_npcs.erase(key);
 		}
 		SaveUnlocked();
 	}
 
-	void SetNpcEnabled(RE::Actor* a_actor, std::optional<bool> a_enabled)
+	void UpdateOutfit(RE::TESObjectARMO* a_armor, const std::function<void(Rule&)>& a_fn)
 	{
-		const auto key = NpcKey(a_actor);
-		if (key.empty()) {
+		const auto key = FormKey(a_armor);
+		if (key.empty() || !a_fn) {
 			return;
 		}
 		std::lock_guard l(g_mutex);
-		auto&           r = g_npcs[key];
-		r.name = NpcName(a_actor);
-		r.enabled = a_enabled;
+		auto&           r = g_outfits[key];
+		r.name = ArmorName(a_armor);
+		a_fn(r);
+		ClampRule(r);
 		if (r.empty()) {
-			g_npcs.erase(key);
+			g_outfits.erase(key);
 		}
 		SaveUnlocked();
+	}
+
+	void SetNpcLength(RE::Actor* a_actor, std::optional<float> a_lengthPct)
+	{
+		UpdateNpc(a_actor, [&](Rule& r) {
+			if (a_lengthPct.has_value()) {
+				r.lengthPct = *a_lengthPct;
+				if (r.enabled.has_value() && !*r.enabled) {
+					r.enabled = true;
+				}
+			} else {
+				r.lengthPct.reset();
+			}
+		});
+	}
+
+	void SetNpcEnabled(RE::Actor* a_actor, std::optional<bool> a_enabled)
+	{
+		UpdateNpc(a_actor, [&](Rule& r) { r.enabled = a_enabled; });
 	}
 
 	void ClearNpc(RE::Actor* a_actor)
@@ -296,41 +396,21 @@ namespace Overrides
 
 	void SetOutfitLength(RE::TESObjectARMO* a_armor, std::optional<float> a_lengthPct)
 	{
-		const auto key = FormKey(a_armor);
-		if (key.empty()) {
-			return;
-		}
-		std::lock_guard l(g_mutex);
-		auto&           r = g_outfits[key];
-		r.name = ArmorName(a_armor);
-		if (a_lengthPct.has_value()) {
-			r.lengthPct = std::clamp(*a_lengthPct, kMinLength, kMaxLength);
-			if (r.enabled.has_value() && !*r.enabled) {
-				r.enabled = true;
+		UpdateOutfit(a_armor, [&](Rule& r) {
+			if (a_lengthPct.has_value()) {
+				r.lengthPct = *a_lengthPct;
+				if (r.enabled.has_value() && !*r.enabled) {
+					r.enabled = true;
+				}
+			} else {
+				r.lengthPct.reset();
 			}
-		} else {
-			r.lengthPct.reset();
-		}
-		if (r.empty()) {
-			g_outfits.erase(key);
-		}
-		SaveUnlocked();
+		});
 	}
 
 	void SetOutfitEnabled(RE::TESObjectARMO* a_armor, std::optional<bool> a_enabled)
 	{
-		const auto key = FormKey(a_armor);
-		if (key.empty()) {
-			return;
-		}
-		std::lock_guard l(g_mutex);
-		auto&           r = g_outfits[key];
-		r.name = ArmorName(a_armor);
-		r.enabled = a_enabled;
-		if (r.empty()) {
-			g_outfits.erase(key);
-		}
-		SaveUnlocked();
+		UpdateOutfit(a_armor, [&](Rule& r) { r.enabled = a_enabled; });
 	}
 
 	void ClearOutfit(RE::TESObjectARMO* a_armor)

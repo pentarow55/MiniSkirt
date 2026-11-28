@@ -419,6 +419,12 @@ namespace DebugCmd
 					TargetMenu::OpenForLookedAt();
 				}
 				Result("targetmenu opened");
+			} else if (a_line.rfind("@select ", 0) == 0) {
+				const int idx = std::stoi(a_line.substr(8));
+				if (auto tasks = SKSE::GetTaskInterface()) {
+					tasks->AddUITask([idx] { RE::MessageBoxMenu::SelectOption(idx); });
+				}
+				Result(std::format("select {}", idx));
 			} else if (a_line.rfind("@done ", 0) == 0) {
 				Result("done " + a_line.substr(6));
 			} else if (!a_line.empty()) {
