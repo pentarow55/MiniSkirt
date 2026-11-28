@@ -117,6 +117,15 @@
       "position": 1
     },
     {
+      "id": "bReplaceLegs:General",
+      "text": "$MSK_ReplaceLegsText",
+      "help": "$MSK_ReplaceLegsHelp",
+      "type": "toggle",
+      "valueOptions": {
+        "sourceType": "ModSettingBool"
+      }
+    },
+    {
       "id": "fBandTop:General",
       "text": "$MSK_LegTopText",
       "help": "$MSK_LegTopHelp",

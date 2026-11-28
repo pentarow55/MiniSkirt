@@ -121,6 +121,9 @@ namespace Overrides
 				if (auto fc = v.find("flareCurve"); fc != v.end() && fc->is_number()) {
 					r.flareCurve = fc->get<float>();
 				}
+				if (auto rl = v.find("replaceLegs"); rl != v.end() && rl->is_boolean()) {
+					r.replaceLegs = rl->get<bool>();
+				}
 				if (auto uw = v.find("underwear"); uw != v.end() && uw->is_boolean()) {
 					r.underwear = uw->get<bool>();
 				}
@@ -168,6 +171,9 @@ namespace Overrides
 				}
 				if (r.flareCurve.has_value()) {
 					item["flareCurve"] = Round1(*r.flareCurve);
+				}
+				if (r.replaceLegs.has_value()) {
+					item["replaceLegs"] = *r.replaceLegs;
 				}
 				if (r.underwear.has_value()) {
 					item["underwear"] = *r.underwear;
@@ -239,6 +245,10 @@ namespace Overrides
 				a_out.flareCurve = *a_r.flareCurve;
 				a_out.flareCurveSource = a_src;
 			}
+			if (a_r.replaceLegs.has_value()) {
+				a_out.replaceLegs = *a_r.replaceLegs;
+				a_out.replaceLegsSource = a_src;
+			}
 			if (a_r.underwear.has_value()) {
 				a_out.underwear = *a_r.underwear;
 				a_out.underwearSource = a_src;
@@ -307,6 +317,7 @@ namespace Overrides
 		out.flareAngle = std::clamp(a_global.flareAngle, 0.0f, 30.0f);
 		out.flareStart = std::clamp(a_global.flareStart, 0.0f, 100.0f);
 		out.flareCurve = std::clamp(a_global.flareCurve, -10.0f, 20.0f);
+		out.replaceLegs = a_global.replaceLegs;
 		out.underwear = a_global.underwear;
 		out.skirtGap = std::clamp(a_global.skirtGap, 0.0f, 8.0f);
 		out.skirtGapNoBone = std::clamp(a_global.skirtGapNoBone, 0.0f, 10.0f);

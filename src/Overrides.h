@@ -15,7 +15,8 @@ namespace Overrides
 		std::optional<float> hipEase;         // 0..8
 		std::optional<float> flareAngle;      // 0..30
 		std::optional<float> flareStart;      // 0..100 (0=お尻の線, 100=ウエスト直下)
-		std::optional<float> flareCurve;      // -100..+100 (-100=裾広がり, 0=直線, +100=ベル型)
+		std::optional<float> flareCurve;      // -10..+20 (中間の広がり)
+		std::optional<bool>  replaceLegs;     // true=本人の脚を使う, false=服の元の脚を残す
 		std::optional<bool>  underwear;       // true=下着あり, false=なし
 		std::optional<float> skirtGap;        // 0..8
 		std::optional<float> skirtGapNoBone;  // 0..10
@@ -23,8 +24,8 @@ namespace Overrides
 		bool empty() const
 		{
 			return !enabled.has_value() && !lengthPct.has_value() && !hemStyle.has_value() && !hipEase.has_value() &&
-			       !flareAngle.has_value() && !flareStart.has_value() && !flareCurve.has_value() && !underwear.has_value() &&
-			       !skirtGap.has_value() && !skirtGapNoBone.has_value();
+			       !flareAngle.has_value() && !flareStart.has_value() && !flareCurve.has_value() && !replaceLegs.has_value() &&
+			       !underwear.has_value() && !skirtGap.has_value() && !skirtGapNoBone.has_value();
 		}
 	};
 
@@ -45,6 +46,7 @@ namespace Overrides
 		float flareAngle{ 5.0f };
 		float flareStart{ 0.0f };
 		float flareCurve{ 0.0f };
+		bool  replaceLegs{ true };
 		bool  underwear{ true };
 		float skirtGap{ 1.0f };
 		float skirtGapNoBone{ 1.0f };
@@ -59,6 +61,7 @@ namespace Overrides
 		float  flareAngle{ 5.0f };
 		float  flareStart{ 0.0f };
 		float  flareCurve{ 0.0f };
+		bool   replaceLegs{ true };
 		bool   underwear{ true };
 		float  skirtGap{ 1.0f };
 		float  skirtGapNoBone{ 1.0f };
@@ -70,6 +73,7 @@ namespace Overrides
 		Source flareAngleSource{ Source::kGlobal };
 		Source flareStartSource{ Source::kGlobal };
 		Source flareCurveSource{ Source::kGlobal };
+		Source replaceLegsSource{ Source::kGlobal };
 		Source underwearSource{ Source::kGlobal };
 		Source skirtGapSource{ Source::kGlobal };
 		Source skirtGapNoBoneSource{ Source::kGlobal };

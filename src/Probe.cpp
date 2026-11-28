@@ -48,6 +48,7 @@ namespace Probe
 			float skirtGap{ 1.0f };        // スカートを帯の体から離す幅（スカートにお尻の揺れ骨があるとき）
 			float skirtGapNoBone{ 1.0f };  // 同（お尻の揺れ骨が無く、お尻の揺れに追従できないとき）
 			bool  freezeJiggle{ false };   // 帯の揺れ骨を止める（最後の手段。全 NPC 共通）
+			bool  replaceLegs{ true };     // 本人の脚（帯）に置き換える。オフなら服の元の脚を残す
 			bool  underwear{ true };       // スカートの中に下着を着ける（帯の元を下着つきの体にする）
 			bool  bodyWeights{ true };     // お尻の揺れ骨が無い服で、体に近いスカートの頂点に体の重みを混ぜる（姿勢でお尻が突き抜けない）
 			bool  weldCeiling{ true };     // スカートの中の「下向きの水平な面」（覗くと黒い天井になる）を面積 0 にする
@@ -148,6 +149,8 @@ namespace Probe
 					g_cfg.skirtGapNoBone = F(val);
 				} else if (key == "band_freeze_jiggle") {
 					g_cfg.freezeJiggle = B(val);
+				} else if (key == "replace_legs") {
+					g_cfg.replaceLegs = B(val);
 				} else if (key == "underwear") {
 					g_cfg.underwear = B(val);
 				} else if (key == "two_sided") {
@@ -184,6 +187,8 @@ namespace Probe
 					g_cfg.skirtGap = F(val);
 				} else if (key == "fSkirtGapNoBone") {
 					g_cfg.skirtGapNoBone = F(val);
+				} else if (key == "bReplaceLegs") {
+					g_cfg.replaceLegs = B(val);
 				} else if (key == "bUnderwear") {
 					g_cfg.underwear = B(val);
 				} else if (key == "iHemStyle") {
@@ -771,6 +776,7 @@ namespace Probe
 			float                         flareAngle{ 5.0f };
 			float                         flareStart{ 0.0f };
 			float                         flareCurve{ 0.0f };
+			bool                          replaceLegs{ true };
 			bool                          underwear{ true };
 			float                         skirtGap{ 1.0f };
 			float                         skirtGapNoBone{ 1.0f };
@@ -831,6 +837,7 @@ namespace Probe
 			gdef.flareAngle = g_cfg.flareAngle;
 			gdef.flareStart = g_cfg.flareStart;
 			gdef.flareCurve = g_cfg.flareCurve;
+			gdef.replaceLegs = g_cfg.replaceLegs;
 			gdef.underwear = g_cfg.underwear;
 			gdef.skirtGap = g_cfg.skirtGap;
 			gdef.skirtGapNoBone = g_cfg.skirtGapNoBone;
@@ -873,6 +880,7 @@ namespace Probe
 			a_job.flareAngle = resolved.flareAngle;
 			a_job.flareStart = resolved.flareStart;
 			a_job.flareCurve = resolved.flareCurve;
+			a_job.replaceLegs = resolved.replaceLegs;
 			a_job.underwear = resolved.underwear;
 			a_job.skirtGap = resolved.skirtGap;
 			a_job.skirtGapNoBone = resolved.skirtGapNoBone;
@@ -914,20 +922,22 @@ namespace Probe
 				return false;
 			}
 			// 帯（足首〜上端の裸の体）を先に用意する。用意できなければ縮めない（縮めると脚が消えるので、ロングのままにする）
-			// スカートの中に着ける下着（所持品・服装・ランダム）。無効なら裸の体だけ
-			std::string underwear;
-			if (a_job.underwear && !DevFlags::On(DevFlags::kNoUnderwear)) {
-				underwear = Underwear::Find(actor, armor, static_cast<int>(std::lround(g_cfg.bandTop))).path;
-			}
-			if (!DevFlags::On(DevFlags::kNoBand)) {
-				if (!Band::Attach(actor, underwear)) {
-					logger::info("  → 帯（裸の体）を用意できないので、この NPC のスカートは縮めない（ロングのまま）。帯ファイルが次の起動から読めれば短くなる");
-					return false;
+			// 「本人の脚を使う」がオフの場合は帯を付けず（付いていれば外し）、服の元の脚をそのまま残してカットだけ行う
+			if (!a_job.replaceLegs) {
+				Band::Detach(actor, "本人の脚を使わない設定");
+			} else {
+				std::string underwear;
+				if (a_job.underwear && !DevFlags::On(DevFlags::kNoUnderwear)) {
+					underwear = Underwear::Find(actor, armor, static_cast<int>(std::lround(g_cfg.bandTop))).path;
 				}
-				// 帯の肌の材質の付け替えは、帯を付けたのと同じフレームで（まだ一度も描かれていないうちに）する。
-				// 段を分けて次のフレームにしたら、描かれた後の材質を取り替えることになり、VR でゲームが固まった（ドラゴンズリーチ・バナード・メアで 2 回とも、この直後に止まった）
-				if (!DevFlags::On(DevFlags::kNoSkin)) {
-					Band::MatchSkin(actor, obj.partClone.get());
+				if (!DevFlags::On(DevFlags::kNoBand)) {
+					if (!Band::Attach(actor, underwear)) {
+						logger::info("  → 帯（裸の体）を用意できないので、この NPC のスカートは縮めない（ロングのまま）。帯ファイルが次の起動から読めれば短くなる");
+						return false;
+					}
+					if (!DevFlags::On(DevFlags::kNoSkin)) {
+						Band::MatchSkin(actor, obj.partClone.get());
+					}
 				}
 			}
 			if (DevFlags::On(DevFlags::kNoShorten)) {
@@ -970,13 +980,19 @@ namespace Probe
 				g_hemNew = 1e9f;
 				g_anyCut = false;
 				Walk(root, a_job.who);
-				Band::HideOutfitLegs(actor, root);
+				if (a_job.replaceLegs) {
+					Band::HideOutfitLegs(actor, root);
+				}
 			} else if (a_k == 2) {
 				// 鎧は重なった板の間隔を保って広げる（比で縮尺すると板が同じ半径に潰れて背中に穴が空いた）。
 				// 切ったスカートが無ければ（丈 100% など）A ラインにはせず、差し替えた脚の腰に当たる所だけ外へ出す（形は元のまま）
-				Band::ShapeSkirt(actor, g_skirts, g_cfg.waist, g_hemNew < 1e8f ? g_hemNew : g_curHem, a_job.hipEase, a_job.flareAngle, g_armorMode, !g_anyCut, a_job.flareStart, a_job.flareCurve);
+				if (a_job.replaceLegs) {
+					Band::ShapeSkirt(actor, g_skirts, g_cfg.waist, g_hemNew < 1e8f ? g_hemNew : g_curHem, a_job.hipEase, a_job.flareAngle, g_armorMode, !g_anyCut, a_job.flareStart, a_job.flareCurve);
+				}
 			} else {
-				Band::FitSkirt(actor, g_skirts, g_hemNew < 1e8f ? g_hemNew : g_curHem, a_job.skirtGap, a_job.skirtGapNoBone, g_cfg.bodyWeights);
+				if (a_job.replaceLegs) {
+					Band::FitSkirt(actor, g_skirts, g_hemNew < 1e8f ? g_hemNew : g_curHem, a_job.skirtGap, a_job.skirtGapNoBone, g_cfg.bodyWeights);
+				}
 				g_skirtActors.insert(a_job.id);
 			}
 			a_job.us[a_k] = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t0).count();
@@ -1376,7 +1392,7 @@ namespace Probe
 			const bool changed = topChanged || old.enabled != g_cfg.enabled || old.hem != g_cfg.hem || old.hemStyle != g_cfg.hemStyle || old.excludeElderly != g_cfg.excludeElderly || old.hipEase != g_cfg.hipEase || old.flareAngle != g_cfg.flareAngle ||
 			                     old.flareStart != g_cfg.flareStart || old.flareCurve != g_cfg.flareCurve ||
 			                     old.skirtGap != g_cfg.skirtGap || old.skirtGapNoBone != g_cfg.skirtGapNoBone || old.waist != g_cfg.waist ||
-			                     old.remapWeights != g_cfg.remapWeights || old.underwear != g_cfg.underwear;
+			                     old.remapWeights != g_cfg.remapWeights || old.replaceLegs != g_cfg.replaceLegs || old.underwear != g_cfg.underwear;
 			if (!changed) {
 				return;  // メニューを閉じるたびに読むので、変わっていなければ何も書かない
 			}
@@ -1559,6 +1575,7 @@ namespace Probe
 		gdef.flareAngle = g_cfg.flareAngle;
 		gdef.flareStart = g_cfg.flareStart;
 		gdef.flareCurve = g_cfg.flareCurve;
+		gdef.replaceLegs = g_cfg.replaceLegs;
 		gdef.underwear = g_cfg.underwear;
 		gdef.skirtGap = g_cfg.skirtGap;
 		gdef.skirtGapNoBone = g_cfg.skirtGapNoBone;

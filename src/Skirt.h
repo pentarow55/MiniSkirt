@@ -924,19 +924,22 @@ namespace Skirt
 				const float ft = tf - fl;
 				const float RB = rb[t0] * (1 - ft) + rb[t1] * ft;
 				const float ZB = zb[t0] * (1 - ft) + zb[t1] * ft;
-				const float zTopStart = (std::max)(ZB, a_top - 2.0f);
-				const float zStart = ZB + (zTopStart - ZB) * startFrac;
+				// 短い丈でも必ず「現在のすそ a_hem 〜 上端 a_top」の中で広がるよう開始位置を収める
+				const float skirtH = (std::max)(a_top - a_hem, 2.0f);
+				const float zTopStart = a_top - (std::min)(2.0f, skirtH * 0.1f);
+				const float zMinStart = a_hem + skirtH * 0.5f;
+				const float zBase = (std::clamp)(ZB, zMinStart, zTopStart);
+				const float zStart = zBase + (zTopStart - zBase) * startFrac;
 				const float r0 = (std::max)(env.Lerp(zf, tf), 1e-3f);
 				const float r0t = env.Lerp((a_top - z0) / kDz - 0.5f, tf);
 				const float r0s = env.Lerp((zStart - z0) / kDz - 0.5f, tf);
-				const float rBodyStart = startFrac > 1e-3f ? benvUp.Lerp((zStart - z0) / kDz - 0.5f, tf) : RB;
+				const float rBodyStart = (startFrac > 1e-3f || zBase > ZB + 0.5f) ? benvUp.Lerp((zStart - z0) / kDz - 0.5f, tf) : RB;
 				const float rStart = (std::max)(rBodyStart + a_ease, r0s);
 				float       rt;
 				if (a_expandOnly && p.z < zStart) {
 					rt = 0.0f;  // 開始位置より下は体の外形（下の bz）だけ
 				} else if (p.z < zStart) {
-					// 3 点（開始 u=0, 中間 u=0.5, 裾 u=1）を滑らかな 2 次カーブで結ぶ:
-					// D(u) = dHem * u + 4 * midOffset * u * (1 - u)
+					// 現在のスカート丈（開始 zStart 〜 現在のすそ a_hem）の 3 点（u=0, 中間 u=0.5, すそ u=1）を滑らかな 2 次カーブで結ぶ
 					const float span = (std::max)(zStart - a_hem, 1.0f);
 					const float u = (std::max)(zStart - p.z, 0.0f) / span;
 					const float uClamped = (std::clamp)(u, 0.0f, 1.0f);
