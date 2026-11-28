@@ -56,7 +56,7 @@ namespace Probe
 			bool  twoSided{ true };        // スカートの shape を両面描画にする（裏側の布が見えるように）
 			bool  cutCloth{ true };        // 裾より下の布を縮めず切る（縮めると布が腰に溜まり、覗くと黒い塊になる）
 			int   hemStyle{ 1 };           // 裾の切り方: 0 = ラフ / 1 = 水平（既定）
-			int   targetHotkey{ 68 };      // 目の前の NPC の個別設定メニューを開くキー（DXScanCode。既定 68 = F10、0 で無効）
+			int   targetHotkey{ 87 };      // 目の前の NPC の個別設定メニューを開くキー（DXScanCode。既定 87 = F11、0 で無効）
 			bool  learnAdjustPower{ false };  // VR・パッド向けの調整パワーを習得する
 		};
 		Cfg g_cfg;

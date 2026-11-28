@@ -682,13 +682,18 @@ namespace TargetMenu
 			const std::string body = std::format("{} ({:.0f}..{:.0f}{})\n{}\n{}: {} ({})", title, minV, maxV, unit,
 				TargetHeader(actor, armor, a_scope), Tr("$MSK_MenuCurrentLabel", "Current"), valStr, SourceLabel(src));
 
-			const float              deltas[4] = { -bigStep, -smallStep, +smallStep, +bigStep };
+			std::vector<float> deltas;
+			if (isInt) {
+				deltas = { -bigStep, -smallStep, -1.0f, +1.0f, +smallStep, +bigStep };
+			} else {
+				deltas = { -bigStep, -smallStep, +smallStep, +bigStep };
+			}
 			std::vector<std::string> buttons;
-			for (int i = 0; i < 4; ++i) {
+			for (const float d : deltas) {
 				if (isInt) {
-					buttons.push_back(std::format("{:+.0f}{}", deltas[i], unit));
+					buttons.push_back(std::format("{:+.0f}{}", d, unit));
 				} else {
-					buttons.push_back(std::format("{:+.1f}{}", deltas[i], unit));
+					buttons.push_back(std::format("{:+.1f}{}", d, unit));
 				}
 			}
 			buttons.push_back(Tr("$MSK_MenuBtnResetItem", "Reset to Default"));
@@ -696,11 +701,11 @@ namespace TargetMenu
 
 			ShowMenu(
 				body, buttons,
-				[a_actorId, a_armorId, a_scope, a_field, iniKey, curVal, defaultVal, minV, maxV, smallStep, bigStep](std::int32_t a_idx) {
+				[a_actorId, a_armorId, a_scope, a_field, iniKey, curVal, defaultVal, minV, maxV, deltas](std::int32_t a_idx) {
 					auto act = a_actorId ? RE::TESForm::LookupByID<RE::Actor>(a_actorId) : nullptr;
 					auto arm = a_armorId ? RE::TESForm::LookupByID<RE::TESObjectARMO>(a_armorId) : nullptr;
-					const float deltasLocal[4] = { -bigStep, -smallStep, +smallStep, +bigStep };
-					auto        setField = [&](std::optional<float> v) {
+					const auto nDeltas = static_cast<std::int32_t>(deltas.size());
+					auto       setField = [&](std::optional<float> v) {
                         if (a_scope == Scope::kGlobal) {
                             const float gval = v.value_or(defaultVal);
                             Probe::UpdateGlobalSetting(iniKey, std::format("{:.6f}", gval));
@@ -739,13 +744,13 @@ namespace TargetMenu
                         ApplyReprocess(a_actorId, a_armorId, a_scope);
 					};
 
-					if (a_idx >= 0 && a_idx < 4) {
-						const float nextVal = std::clamp(curVal + deltasLocal[a_idx], minV, maxV);
+					if (a_idx >= 0 && a_idx < nDeltas) {
+						const float nextVal = std::clamp(curVal + deltas[static_cast<std::size_t>(a_idx)], minV, maxV);
 						if (std::fabs(nextVal - curVal) > 1e-4f) {
 							setField(nextVal);
 						}
 						OpenFloatSubMenu(a_actorId, a_armorId, a_scope, a_field, a_idx);
-					} else if (a_idx == 4) {
+					} else if (a_idx == nDeltas) {
 						setField(std::nullopt);
 						OpenFloatSubMenu(a_actorId, a_armorId, a_scope, a_field, a_idx);
 					} else {

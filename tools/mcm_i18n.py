@@ -8,31 +8,40 @@ import pathlib
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 ASSETS = ROOT / "assets"
 
-# 画面の並び（鍵の名前 → 種類など）。鍵は Text / Help で終え、ほかの鍵の頭と重ならないようにする
-LAYOUT = [
-    {"type": "header", "key": "PerTarget"},
-    {"type": "text", "key": "PerTargetHint"},
-    {"type": "keymap", "key": "TargetHotkey", "id": "iTargetHotkey:General"},
-    {"type": "toggle", "key": "LearnAdjustPower", "id": "bLearnAdjustPower:General"},
-    {"type": "empty"},
-    {"type": "header", "key": "General"},
-    {"type": "toggle", "key": "Enabled", "id": "bEnabled:General"},
-    {"type": "toggle", "key": "Elderly", "id": "bExcludeElderly:General"},
-    {"type": "empty"},
-    {"type": "header", "key": "Shape"},
-    {"type": "slider", "key": "Hem", "id": "fSkirtLength:General", "min": 10, "max": 100, "step": 1, "fmt": "{0}"},
-    {"type": "stepper", "key": "CutStyle", "id": "iHemStyle:General", "options": ["CutOptRough", "CutOptLevel"]},
-    {"type": "slider", "key": "HipEase", "id": "fHipEase:General", "min": 0, "max": 8, "step": 0.5, "fmt": "{1}"},
-    {"type": "slider", "key": "Flare", "id": "fFlareAngle:General", "min": 0, "max": 30, "step": 1, "fmt": "{0}"},
-    {"type": "slider", "key": "FlareStart", "id": "fFlareStart:General", "min": 0, "max": 100, "step": 5, "fmt": "{0}"},
-    {"type": "slider", "key": "FlareCurve", "id": "fFlareCurve:General", "min": -50, "max": 50, "step": 5, "fmt": "{0}"},
-    {"type": "slider", "key": "FlareBias", "id": "fFlareBias:General", "min": -50, "max": 50, "step": 5, "fmt": "{0}"},
-    {"type": "header", "key": "Legs", "position": 1},
-    {"type": "toggle", "key": "ReplaceLegs", "id": "bReplaceLegs:General"},
-    {"type": "slider", "key": "LegTop", "id": "fBandTop:General", "min": 50, "max": 90, "step": 1, "fmt": "{0}"},
-    {"type": "toggle", "key": "Underwear", "id": "bUnderwear:General"},
-    {"type": "slider", "key": "Gap", "id": "fSkirtGap:General", "min": 0, "max": 8, "step": 0.5, "fmt": "{1}"},
-    {"type": "slider", "key": "GapStiff", "id": "fSkirtGapNoBone:General", "min": 0, "max": 10, "step": 0.5, "fmt": "{1}"},
+# 画面の並び（2 タブ構成。鍵は Text / Help で終え、ほかの鍵の頭と重ならないようにする）
+PAGES = [
+    {
+        "key": "PageSkirt",
+        "items": [
+            {"type": "header", "key": "PerTarget"},
+            {"type": "text", "key": "PerTargetHint"},
+            {"type": "keymap", "key": "TargetHotkey", "id": "iTargetHotkey:General"},
+            {"type": "toggle", "key": "LearnAdjustPower", "id": "bLearnAdjustPower:General"},
+            {"type": "empty"},
+            {"type": "header", "key": "General"},
+            {"type": "toggle", "key": "Enabled", "id": "bEnabled:General"},
+            {"type": "toggle", "key": "Elderly", "id": "bExcludeElderly:General"},
+            {"type": "header", "key": "Shape", "position": 1},
+            {"type": "slider", "key": "Hem", "id": "fSkirtLength:General", "min": 10, "max": 100, "step": 1, "fmt": "{0}"},
+            {"type": "stepper", "key": "CutStyle", "id": "iHemStyle:General", "options": ["CutOptRough", "CutOptLevel"]},
+            {"type": "slider", "key": "HipEase", "id": "fHipEase:General", "min": 0, "max": 8, "step": 0.5, "fmt": "{1}"},
+            {"type": "slider", "key": "Flare", "id": "fFlareAngle:General", "min": 0, "max": 60, "step": 1, "fmt": "{0}"},
+            {"type": "slider", "key": "FlareStart", "id": "fFlareStart:General", "min": 0, "max": 100, "step": 1, "fmt": "{0}"},
+            {"type": "slider", "key": "FlareCurve", "id": "fFlareCurve:General", "min": -50, "max": 50, "step": 1, "fmt": "{0}"},
+            {"type": "slider", "key": "FlareBias", "id": "fFlareBias:General", "min": -50, "max": 50, "step": 1, "fmt": "{0}"},
+        ],
+    },
+    {
+        "key": "PageLegs",
+        "items": [
+            {"type": "header", "key": "Legs"},
+            {"type": "toggle", "key": "ReplaceLegs", "id": "bReplaceLegs:General"},
+            {"type": "slider", "key": "LegTop", "id": "fBandTop:General", "min": 50, "max": 90, "step": 1, "fmt": "{0}"},
+            {"type": "toggle", "key": "Underwear", "id": "bUnderwear:General"},
+            {"type": "slider", "key": "Gap", "id": "fSkirtGap:General", "min": 0, "max": 8, "step": 0.5, "fmt": "{1}"},
+            {"type": "slider", "key": "GapStiff", "id": "fSkirtGapNoBone:General", "min": 0, "max": 10, "step": 0.5, "fmt": "{1}"},
+        ],
+    },
 ]
 
 # 日本語のフォントに無い字（例: 裾、≒）は使わない。目安は「数: 説明」の形にする（≒ は空白に見えた）。
@@ -40,6 +49,8 @@ LAYOUT = [
 T = {}
 
 T["JAPANESE"] = {
+    "PageSkirt": "基本・スカート",
+    "PageLegs": "脚・下着",
     "General": "全体",
     "Enabled": ("有効", "オンにすると、女性 NPC のスカート丈を変更します。また、服に付いている脚を隠して、使っている体（CBBE など）の脚を表示します。"),
     "Elderly": ("年配の女性を外す", "オンにすると、年配の女性（種族が年配の NPC）には何もしません。スカートは元の長さのままで、脚も足しません。"),
@@ -60,12 +71,14 @@ T["JAPANESE"] = {
     "Gap": ("スカートと脚のすき間", "スカートを脚から離す幅。近すぎる所だけ外へ押し出します（お尻の揺れに合わせてスカートも動く服）。お尻がスカートから突き抜けるときは大きくします。"),
     "GapStiff": ("すき間（スカートが揺れない服）", "お尻が揺れてもスカートがいっしょに動かない服での、スカートと脚のすき間。突き抜けやすいので広めにします。"),
     "PerTarget": "ゲーム内ライブ調整（NPC別・衣装別）",
-    "PerTargetHint": ("※NPCの前で調整キー（既定: F10）を押すと、見た目を見ながら個別・衣装別・全体を調整できます", "ゲーム中に女性NPCの前で調整キー（既定: F10）を押すと、画面左側にメニューが開き、見た目を確認しながら丈や形をリアルタイム調整できます。"),
+    "PerTargetHint": ("※NPCの前で調整キー（既定: F11）を押すと、見た目を見ながら個別・衣装別・全体を調整できます", "ゲーム中に女性NPCの前で調整キー（既定: F11）を押すと、画面左側にメニューが開き、見た目を確認しながら丈や形をリアルタイム調整できます。"),
     "TargetHotkey": ("対象を調整するキー", "目の前の女性 NPC に対して、その NPC 個別または着ている衣装ごとのスカート丈・除外を設定するメニューを開きます。設定は全セーブ共通のファイルに保存されます。"),
     "LearnAdjustPower": ("調整パワーを習得（VR / パッド向け）", "オンにすると、目の前の女性 NPC の丈・除外メニューを開くパワー「MiniSkirt: Adjust Target」を習得します。キーボードを使わない VR やコントローラー環境で便利です。"),
 }
 
 T["ENGLISH"] = {
+    "PageSkirt": "General & Skirt",
+    "PageLegs": "Legs & Underwear",
     "General": "General",
     "Enabled": ("Enabled", "When on, the skirt length of women NPCs is changed. The legs that come with the outfit are also hidden, and the legs of the body you use (CBBE, etc.) are shown instead."),
     "Elderly": ("Exclude elderly women", "When on, elderly women (NPCs of the elder race) are left alone: their skirts keep the original length and no legs are added."),
@@ -86,12 +99,14 @@ T["ENGLISH"] = {
     "Gap": ("Gap between skirt and legs", "How far the skirt is kept from the legs. Only the parts that are too close are pushed out (outfits whose skirt moves with the buttocks). Increase it if the buttocks poke through."),
     "GapStiff": ("Gap (skirts that don't sway)", "Gap between skirt and legs for outfits whose skirt does not move when the buttocks jiggle. Set it wider, since these poke through more easily."),
     "PerTarget": "In-Game Live Menu (Per-NPC / Per-Outfit)",
-    "PerTargetHint": ("Tip: Press Hotkey (default F10) facing an NPC to adjust live", "Press the hotkey (default: F10) while facing a female NPC to open the live adjustment menu for that NPC, their outfit, or global settings."),
+    "PerTargetHint": ("Tip: Press Hotkey (default F11) facing an NPC to adjust live", "Press the hotkey (default: F11) while facing a female NPC to open the live adjustment menu for that NPC, their outfit, or global settings."),
     "TargetHotkey": ("Adjust Target Hotkey", "Press while looking at a female NPC to change the skirt length or exclusion for that NPC or their outfit. Saved to a shared config file across all saves."),
     "LearnAdjustPower": ("Learn Adjust Power (VR / Gamepad)", "When on, grants the lesser power 'MiniSkirt: Adjust Target' to open the per-NPC / per-outfit menu without a keyboard."),
 }
 
 T["FRENCH"] = {
+    "PageSkirt": "Général & Jupe",
+    "PageLegs": "Jambes & Lingerie",
     "General": "Général",
     "Enabled": ("Activé", "Activé : la longueur des jupes des PNJ féminins est modifiée. De plus, les jambes fournies avec la tenue sont masquées et celles du corps que vous utilisez (CBBE, etc.) sont affichées."),
     "Elderly": ("Exclure les femmes âgées", "Activé : les femmes âgées (PNJ de la race des anciens) ne sont pas modifiées. Leur jupe garde sa longueur d'origine et aucune jambe n'est ajoutée."),
@@ -112,12 +127,14 @@ T["FRENCH"] = {
     "Gap": ("Écart jupe / jambes", "Distance gardée entre la jupe et les jambes. Seules les parties trop proches sont repoussées (tenues dont la jupe suit le mouvement des fesses). Augmentez si les fesses traversent."),
     "GapStiff": ("Écart (jupes rigides)", "Écart pour les tenues dont la jupe ne suit pas le mouvement des fesses. Mettez-le plus grand, car elles traversent plus facilement."),
     "PerTarget": "Par PNJ / Par tenue",
-    "PerTargetHint": ("Astuce : Touche (F10) devant un PNJ pour ajuster en direct", "Appuyez sur la touche (défaut : F10) face à un PNJ féminin pour ajuster ce PNJ, sa tenue ou les réglages généraux en direct."),
+    "PerTargetHint": ("Astuce : Touche (F11) devant un PNJ pour ajuster en direct", "Appuyez sur la touche (défaut : F11) face à un PNJ féminin pour ajuster ce PNJ, sa tenue ou les réglages généraux en direct."),
     "TargetHotkey": ("Touche d'ajustement", "Appuyez en regardant un PNJ féminin pour régler la longueur ou l'exclusion pour ce PNJ ou sa tenue."),
     "LearnAdjustPower": ("Pouvoir d'ajustement (VR / Manette)", "Active le pouvoir 'MiniSkirt: Adjust Target' pour ouvrir le menu sans clavier."),
 }
 
 T["GERMAN"] = {
+    "PageSkirt": "Allgemein & Rock",
+    "PageLegs": "Beine & Wäsche",
     "General": "Allgemein",
     "Enabled": ("Aktiviert", "Wenn an: Die Rocklänge weiblicher NPCs wird geändert. Außerdem werden die Beine der Kleidung ausgeblendet und die Beine des verwendeten Körpers (CBBE usw.) angezeigt."),
     "Elderly": ("Ältere Frauen ausnehmen", "Wenn an: Ältere Frauen (NPCs der Rasse der Alten) bleiben unverändert. Ihr Rock behält die ursprüngliche Länge, und es werden keine Beine hinzugefügt."),
@@ -138,12 +155,14 @@ T["GERMAN"] = {
     "Gap": ("Abstand Rock / Beine", "Abstand, den der Rock zu den Beinen hält. Nur zu nahe Stellen werden nach außen gedrückt (Kleidung, deren Rock sich mit dem Po bewegt). Erhöhen, wenn der Po durchragt."),
     "GapStiff": ("Abstand (starre Röcke)", "Abstand für Kleidung, deren Rock sich nicht mit dem Po mitbewegt. Größer wählen, da sie leichter durchragt."),
     "PerTarget": "Pro NPC / Pro Kleidung",
-    "PerTargetHint": ("Tipp: Taste (Standard F10) vor NPC für Live-Anpassung", "Drücke die Taste (Standard: F10) vor einem weiblichen NPC, um Länge und Form pro NPC, Kleidung oder global live anzupassen."),
+    "PerTargetHint": ("Tipp: Taste (Standard F11) vor NPC für Live-Anpassung", "Drücke die Taste (Standard: F11) vor einem weiblichen NPC, um Länge und Form pro NPC, Kleidung oder global live anzupassen."),
     "TargetHotkey": ("Taste zum Anpassen", "Drücken, während ein weiblicher NPC anvisiert wird, um Länge oder Ausnahme für diesen NPC oder die Kleidung einzustellen."),
     "LearnAdjustPower": ("Anpassungskraft lernen (VR / Controller)", "Verleiht die Kraft 'MiniSkirt: Adjust Target', um das Menü ohne Tastatur zu öffnen."),
 }
 
 T["SPANISH"] = {
+    "PageSkirt": "General y falda",
+    "PageLegs": "Piernas y lencería",
     "General": "General",
     "Enabled": ("Activado", "Si está activado, cambia el largo de la falda de las PNJ. Además, oculta las piernas que trae la ropa y muestra las del cuerpo que usas (CBBE, etc.)."),
     "Elderly": ("Excluir a las ancianas", "Si se activa, las ancianas (PNJ de la raza de los ancianos) no se modifican: su falda conserva el largo original y no se añaden piernas."),
@@ -164,12 +183,14 @@ T["SPANISH"] = {
     "Gap": ("Separación falda / piernas", "Distancia que la falda guarda respecto a las piernas. Solo se empujan hacia fuera las partes demasiado cercanas (ropa cuya falda se mueve con los glúteos). Auméntala si los glúteos la atraviesan."),
     "GapStiff": ("Separación (faldas rígidas)", "Separación para ropa cuya falda no se mueve con los glúteos. Ponla más amplia, ya que se atraviesa con más facilidad."),
     "PerTarget": "Por PNJ / Por atuendo",
-    "PerTargetHint": ("Consejo: Pulsa tecla (F10) ante una PNJ para ajustar en vivo", "Pulsa la tecla (por defecto: F10) mirando a una PNJ para ajustar esa PNJ, su atuendo o los ajustes globales en tiempo real."),
+    "PerTargetHint": ("Consejo: Pulsa tecla (F11) ante una PNJ para ajustar en vivo", "Pulsa la tecla (por defecto: F11) mirando a una PNJ para ajustar esa PNJ, su atuendo o los ajustes globales en tiempo real."),
     "TargetHotkey": ("Tecla de ajuste", "Pulsa mirando a una PNJ para cambiar el largo o la exclusión de esa PNJ o su atuendo."),
     "LearnAdjustPower": ("Aprender poder de ajuste (VR / Mando)", "Otorga el poder 'MiniSkirt: Adjust Target' para abrir el menú sin teclado."),
 }
 
 T["ITALIAN"] = {
+    "PageSkirt": "Generale e gonna",
+    "PageLegs": "Gambe e intimo",
     "General": "Generale",
     "Enabled": ("Attivo", "Se attivo, cambia la lunghezza della gonna dei PNG femminili. Inoltre nasconde le gambe incluse nel vestito e mostra quelle del corpo che usi (CBBE, ecc.)."),
     "Elderly": ("Escludi le donne anziane", "Se attivo, le donne anziane (PNG della razza degli anziani) non vengono modificate: la gonna mantiene la lunghezza originale e non si aggiungono gambe."),
@@ -190,12 +211,14 @@ T["ITALIAN"] = {
     "Gap": ("Distanza gonna / gambe", "Distanza che la gonna mantiene dalle gambe. Solo le parti troppo vicine vengono spinte fuori (vestiti la cui gonna si muove con i glutei). Aumentala se i glutei la attraversano."),
     "GapStiff": ("Distanza (gonne rigide)", "Distanza per i vestiti la cui gonna non si muove con i glutei. Impostala più ampia, perché si attraversa più facilmente."),
     "PerTarget": "Per PNG / Per abito",
-    "PerTargetHint": ("Suggerimento: Premi tasto (F10) davanti a un PNG per regolare dal vivo", "Premi il tasto (predefinito: F10) davanti a un PNG femminile per regolare quel PNG, il suo abito o le opzioni globali dal vivo."),
+    "PerTargetHint": ("Suggerimento: Premi tasto (F11) davanti a un PNG per regolare dal vivo", "Premi il tasto (predefinito: F11) davanti a un PNG femminile per regolare quel PNG, il suo abito o le opzioni globali dal vivo."),
     "TargetHotkey": ("Tasto di regolazione", "Premi guardando un PNG femminile per cambiare lunghezza o esclusione per quel PNG o il suo abito."),
     "LearnAdjustPower": ("Impara potere di regolazione (VR / Pad)", "Concede il potere 'MiniSkirt: Adjust Target' per aprire il menu senza tastiera."),
 }
 
 T["POLISH"] = {
+    "PageSkirt": "Ogólne i spódnica",
+    "PageLegs": "Nogi i bielizna",
     "General": "Ogólne",
     "Enabled": ("Włączone", "Po włączeniu zmienia się długość spódnic postaci kobiecych. Ponadto nogi dołączone do stroju są ukrywane, a wyświetlane są nogi używanego ciała (CBBE itp.)."),
     "Elderly": ("Pomiń starsze kobiety", "Po włączeniu starsze kobiety (NPC rasy starców) nie są zmieniane: spódnica zachowuje oryginalną długość i nie są dodawane nogi."),
@@ -216,12 +239,14 @@ T["POLISH"] = {
     "Gap": ("Odstęp spódnica / nogi", "Odstęp spódnicy od nóg. Na zewnątrz odsuwane są tylko zbyt bliskie miejsca (stroje, których spódnica porusza się z pośladkami). Zwiększ, jeśli pośladki przebijają."),
     "GapStiff": ("Odstęp (sztywne spódnice)", "Odstęp dla strojów, których spódnica nie porusza się z pośladkami. Ustaw większy, bo łatwiej je przebić."),
     "PerTarget": "Dla NPC / Dla stroju",
-    "PerTargetHint": ("Wskazówka: Naciśnij klawisz (F10) przed NPC, by regulować na żywo", "Naciśnij klawisz (domyślnie: F10) patrząc na kobiecego NPC, aby na żywo regulować ustawienia dla NPC, stroju lub globalne."),
+    "PerTargetHint": ("Wskazówka: Naciśnij klawisz (F11) przed NPC, by regulować na żywo", "Naciśnij klawisz (domyślnie: F11) patrząc na kobiecego NPC, aby na żywo regulować ustawienia dla NPC, stroju lub globalne."),
     "TargetHotkey": ("Klawisz regulacji", "Naciśnij patrząc na kobiecego NPC, aby ustawić długość lub wykluczenie dla tej postaci lub stroju."),
     "LearnAdjustPower": ("Moc regulacji (VR / Pad)", "Dodaje moc 'MiniSkirt: Adjust Target' do otwierania menu bez klawiatury."),
 }
 
 T["RUSSIAN"] = {
+    "PageSkirt": "Общие и юбка",
+    "PageLegs": "Ноги и бельё",
     "General": "Общие",
     "Enabled": ("Включено", "Если включено, длина юбок женских NPC меняется. Кроме того, ноги, входящие в одежду, скрываются, и показываются ноги используемого тела (CBBE и т. п.)."),
     "Elderly": ("Не трогать пожилых женщин", "Если включить, пожилые женщины (NPC расы стариков) не изменяются: юбка сохраняет исходную длину, ноги не добавляются."),
@@ -242,12 +267,14 @@ T["RUSSIAN"] = {
     "Gap": ("Зазор юбка / ноги", "Насколько юбка отстоит от ног. Наружу сдвигаются только слишком близкие места (одежда, юбка которой движется вместе с ягодицами). Увеличьте, если ягодицы проходят насквозь."),
     "GapStiff": ("Зазор (жёсткие юбки)", "Зазор для одежды, юбка которой не движется вместе с ягодицами. Ставьте больше — сквозь них проходит легче."),
     "PerTarget": "Для NPC / Для одежды",
-    "PerTargetHint": ("Совет: Нажмите клавишу (F10) перед NPC для настройки в игре", "Нажмите клавишу (по умолчанию: F10), глядя на женского NPC, чтобы настраивать длину и форму в реальном времени."),
+    "PerTargetHint": ("Совет: Нажмите клавишу (F11) перед NPC для настройки в игре", "Нажмите клавишу (по умолчанию: F11), глядя на женского NPC, чтобы настраивать длину и форму в реальном времени."),
     "TargetHotkey": ("Клавиша настройки", "Нажмите, глядя на женского NPC, чтобы изменить длину или исключение для этого NPC или его одежды."),
     "LearnAdjustPower": ("Способность настройки (VR / Геймпад)", "Добавляет способность 'MiniSkirt: Adjust Target' для открытия меню без клавиатуры."),
 }
 
 T["CZECH"] = {
+    "PageSkirt": "Obecné a sukně",
+    "PageLegs": "Nohy a prádlo",
     "General": "Obecné",
     "Enabled": ("Zapnuto", "Po zapnutí se změní délka sukní ženských NPC. Navíc se skryjí nohy, které patří k oblečení, a zobrazí se nohy používaného těla (CBBE apod.)."),
     "Elderly": ("Vynechat starší ženy", "Po zapnutí se starší ženy (NPC rasy starců) nemění: sukně si ponechá původní délku a nohy se nepřidávají."),
@@ -268,12 +295,14 @@ T["CZECH"] = {
     "Gap": ("Mezera sukně / nohy", "Jak daleko sukně zůstává od nohou. Ven se odsunou jen příliš blízká místa (oblečení, jehož sukně se hýbe s hýžděmi). Zvyšte, pokud hýždě prochází."),
     "GapStiff": ("Mezera (tuhé sukně)", "Mezera pro oblečení, jehož sukně se nehýbe s hýžděmi. Nastavte větší, protože se snáze prochází."),
     "PerTarget": "Pro NPC / Pro oblečení",
-    "PerTargetHint": ("Tip: Stiskněte klávesu (F10) před NPC pro živé úpravy", "Stiskněte klávesu (výchozí: F10) při pohledu na ženské NPC pro živou úpravu délky a tvaru pro NPC, oblečení či globálně."),
+    "PerTargetHint": ("Tip: Stiskněte klávesu (F11) před NPC pro živé úpravy", "Stiskněte klávesu (výchozí: F11) při pohledu na ženské NPC pro živou úpravu délky a tvaru pro NPC, oblečení či globálně."),
     "TargetHotkey": ("Klávesa úpravy", "Stiskněte při pohledu na ženské NPC pro nastavení délky nebo vynechání daného NPC či oblečení."),
     "LearnAdjustPower": ("Schopnost úpravy (VR / Ovladač)", "Přidá schopnost 'MiniSkirt: Adjust Target' pro otevření menu bez klávesnice."),
 }
 
 T["CHINESE"] = {  # 簡体字（中国語の枠はゲームに 1 つだけ。利用者の多い簡体字にした）
+    "PageSkirt": "常规与裙子",
+    "PageLegs": "双腿与内衣",
     "General": "常规",
     "Enabled": ("启用", "启用后，会改变女性 NPC 的裙长。另外，会隐藏衣服自带的双腿，显示你使用的身体（CBBE 等）的双腿。"),
     "Elderly": ("排除年长女性", "开启后，不改动年长女性（老年种族的 NPC）：裙子保持原来的长度，也不添加双腿。"),
@@ -294,7 +323,7 @@ T["CHINESE"] = {  # 簡体字（中国語の枠はゲームに 1 つだけ。利
     "Gap": ("裙子与双腿的间隙", "裙子与双腿保持的距离。只把太靠近的部分向外推（裙子会随臀部摆动的服装）。臀部穿出时请调大。"),
     "GapStiff": ("间隙（不会摆动的裙子）", "臀部摆动时裙子不会跟着动的服装所用的间隙。更容易穿出，请设大一些。"),
     "PerTarget": "游戏内实时调整（NPC/服装）",
-    "PerTargetHint": ("提示：面对女性NPC按快捷键（默认F10）可实时调整", "面对女性NPC按快捷键（默认F10）即可打开实时调整菜单，按NPC、服装或全局即时调节裙长与裙型。"),
+    "PerTargetHint": ("提示：面对女性NPC按快捷键（默认F11）可实时调整", "面对女性NPC按快捷键（默认F11）即可打开实时调整菜单，按NPC、服装或全局即时调节裙长与裙型。"),
     "TargetHotkey": ("调整目标热键", "面对女性 NPC 按下此键，可单独调整该 NPC 或其服装的裙长和排除设置。设置保存在所有存档通用的文件中。"),
     "LearnAdjustPower": ("习得调整能力（VR / 手柄）", "开启后会获得能力 'MiniSkirt: Adjust Target'，无需键盘即可打开单独设置菜单。"),
 }
@@ -769,9 +798,9 @@ MENU_T = {
 }
 
 
-def build_config():
+def build_items(items):
     content = []
-    for item in LAYOUT:
+    for item in items:
         t = item["type"]
         if t == "empty":
             content.append({"type": "empty"})
@@ -795,36 +824,55 @@ def build_config():
         else:
             e["valueOptions"] = {"min": item["min"], "max": item["max"], "step": item["step"], "formatString": item["fmt"], "sourceType": "ModSettingFloat"}
         content.append(e)
-    cfg = {"modName": "MiniSkirt", "displayName": "MiniSkirt", "minMcmVersion": 9, "cursorFillMode": "topToBottom", "content": content}
+    return content
+
+
+def build_config():
+    pages = [
+        {
+            "pageDisplayName": key(page["key"], "Text"),
+            "cursorFillMode": "topToBottom",
+            "content": build_items(page["items"]),
+        }
+        for page in PAGES
+    ]
+    cfg = {
+        "modName": "MiniSkirt",
+        "displayName": "MiniSkirt",
+        "minMcmVersion": 9,
+        "cursorFillMode": "topToBottom",
+        "content": build_items(PAGES[0]["items"]),
+        "pages": pages,
+    }
     p = ASSETS / "MCM/Config/MiniSkirt/config.json"
     p.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
 def build_translations():
     want = set()
-    for item in LAYOUT:
-        if item["type"] == "header":
-            want.add(item["key"])
-        elif item["type"] != "empty":
-            want.add(item["key"])
-            for opt in item.get("options", ()):
-                want.add(opt)
+    keys_order = []
+    for page in PAGES:
+        want.add(page["key"])
+        keys_order.append(page["key"])
+        for item in page["items"]:
+            if item["type"] != "empty":
+                want.add(item["key"])
+                keys_order.append(item["key"])
+                for opt in item.get("options", ()):
+                    want.add(opt)
+                    keys_order.append(opt)
     out = ASSETS / "Interface/Translations"
     out.mkdir(parents=True, exist_ok=True)
     for lang, d in T.items():
         assert set(d) == want, (lang, set(d) ^ want)
         lines = []
-        for item in LAYOUT:
-            if item["type"] == "empty":
-                continue
-            v = d[item["key"]]
+        for k in keys_order:
+            v = d[k]
             if isinstance(v, str):
-                lines.append(f"{key(item['key'], 'Text')}\t{v}")
+                lines.append(f"{key(k, 'Text')}\t{v}")
             else:
-                lines.append(f"{key(item['key'], 'Text')}\t{v[0]}")
-                lines.append(f"{key(item['key'], 'Help')}\t{v[1]}")
-            for opt in item.get("options", ()):
-                lines.append(f"{key(opt, 'Text')}\t{d[opt]}")
+                lines.append(f"{key(k, 'Text')}\t{v[0]}")
+                lines.append(f"{key(k, 'Help')}\t{v[1]}")
         for mk, mv in MENU_T[lang].items():
             lines.append(f"$MSK_{mk}\t{mv}")
         for s in lines:

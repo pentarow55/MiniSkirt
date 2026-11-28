@@ -57,11 +57,9 @@
       }
     },
     {
-      "type": "empty"
-    },
-    {
       "text": "$MSK_ShapeText",
-      "type": "header"
+      "type": "header",
+      "position": 1
     },
     {
       "id": "fSkirtLength:General",
@@ -123,7 +121,7 @@
       "valueOptions": {
         "min": 0,
         "max": 100,
-        "step": 5,
+        "step": 1,
         "formatString": "{0}",
         "sourceType": "ModSettingFloat"
       }
@@ -136,7 +134,7 @@
       "valueOptions": {
         "min": -50,
         "max": 50,
-        "step": 5,
+        "step": 1,
         "formatString": "{0}",
         "sourceType": "ModSettingFloat"
       }
@@ -149,72 +147,233 @@
       "valueOptions": {
         "min": -50,
         "max": 50,
-        "step": 5,
-        "formatString": "{0}",
-        "sourceType": "ModSettingFloat"
-      }
-    },
-    {
-      "text": "$MSK_LegsText",
-      "type": "header",
-      "position": 1
-    },
-    {
-      "id": "bReplaceLegs:General",
-      "text": "$MSK_ReplaceLegsText",
-      "help": "$MSK_ReplaceLegsHelp",
-      "type": "toggle",
-      "valueOptions": {
-        "sourceType": "ModSettingBool"
-      }
-    },
-    {
-      "id": "fBandTop:General",
-      "text": "$MSK_LegTopText",
-      "help": "$MSK_LegTopHelp",
-      "type": "slider",
-      "valueOptions": {
-        "min": 50,
-        "max": 90,
         "step": 1,
         "formatString": "{0}",
         "sourceType": "ModSettingFloat"
       }
+    }
+  ],
+  "pages": [
+    {
+      "pageDisplayName": "$MSK_PageSkirtText",
+      "cursorFillMode": "topToBottom",
+      "content": [
+        {
+          "text": "$MSK_PerTargetText",
+          "type": "header"
+        },
+        {
+          "text": "$MSK_PerTargetHintText",
+          "help": "$MSK_PerTargetHintHelp",
+          "type": "text"
+        },
+        {
+          "id": "iTargetHotkey:General",
+          "text": "$MSK_TargetHotkeyText",
+          "help": "$MSK_TargetHotkeyHelp",
+          "type": "keymap",
+          "valueOptions": {
+            "sourceType": "ModSettingInt"
+          }
+        },
+        {
+          "id": "bLearnAdjustPower:General",
+          "text": "$MSK_LearnAdjustPowerText",
+          "help": "$MSK_LearnAdjustPowerHelp",
+          "type": "toggle",
+          "valueOptions": {
+            "sourceType": "ModSettingBool"
+          }
+        },
+        {
+          "type": "empty"
+        },
+        {
+          "text": "$MSK_GeneralText",
+          "type": "header"
+        },
+        {
+          "id": "bEnabled:General",
+          "text": "$MSK_EnabledText",
+          "help": "$MSK_EnabledHelp",
+          "type": "toggle",
+          "valueOptions": {
+            "sourceType": "ModSettingBool"
+          }
+        },
+        {
+          "id": "bExcludeElderly:General",
+          "text": "$MSK_ElderlyText",
+          "help": "$MSK_ElderlyHelp",
+          "type": "toggle",
+          "valueOptions": {
+            "sourceType": "ModSettingBool"
+          }
+        },
+        {
+          "text": "$MSK_ShapeText",
+          "type": "header",
+          "position": 1
+        },
+        {
+          "id": "fSkirtLength:General",
+          "text": "$MSK_HemText",
+          "help": "$MSK_HemHelp",
+          "type": "slider",
+          "valueOptions": {
+            "min": 10,
+            "max": 100,
+            "step": 1,
+            "formatString": "{0}",
+            "sourceType": "ModSettingFloat"
+          }
+        },
+        {
+          "id": "iHemStyle:General",
+          "text": "$MSK_CutStyleText",
+          "help": "$MSK_CutStyleHelp",
+          "type": "stepper",
+          "valueOptions": {
+            "options": [
+              "$MSK_CutOptRoughText",
+              "$MSK_CutOptLevelText"
+            ],
+            "sourceType": "ModSettingInt"
+          }
+        },
+        {
+          "id": "fHipEase:General",
+          "text": "$MSK_HipEaseText",
+          "help": "$MSK_HipEaseHelp",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 8,
+            "step": 0.5,
+            "formatString": "{1}",
+            "sourceType": "ModSettingFloat"
+          }
+        },
+        {
+          "id": "fFlareAngle:General",
+          "text": "$MSK_FlareText",
+          "help": "$MSK_FlareHelp",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 60,
+            "step": 1,
+            "formatString": "{0}",
+            "sourceType": "ModSettingFloat"
+          }
+        },
+        {
+          "id": "fFlareStart:General",
+          "text": "$MSK_FlareStartText",
+          "help": "$MSK_FlareStartHelp",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 1,
+            "formatString": "{0}",
+            "sourceType": "ModSettingFloat"
+          }
+        },
+        {
+          "id": "fFlareCurve:General",
+          "text": "$MSK_FlareCurveText",
+          "help": "$MSK_FlareCurveHelp",
+          "type": "slider",
+          "valueOptions": {
+            "min": -50,
+            "max": 50,
+            "step": 1,
+            "formatString": "{0}",
+            "sourceType": "ModSettingFloat"
+          }
+        },
+        {
+          "id": "fFlareBias:General",
+          "text": "$MSK_FlareBiasText",
+          "help": "$MSK_FlareBiasHelp",
+          "type": "slider",
+          "valueOptions": {
+            "min": -50,
+            "max": 50,
+            "step": 1,
+            "formatString": "{0}",
+            "sourceType": "ModSettingFloat"
+          }
+        }
+      ]
     },
     {
-      "id": "bUnderwear:General",
-      "text": "$MSK_UnderwearText",
-      "help": "$MSK_UnderwearHelp",
-      "type": "toggle",
-      "valueOptions": {
-        "sourceType": "ModSettingBool"
-      }
-    },
-    {
-      "id": "fSkirtGap:General",
-      "text": "$MSK_GapText",
-      "help": "$MSK_GapHelp",
-      "type": "slider",
-      "valueOptions": {
-        "min": 0,
-        "max": 8,
-        "step": 0.5,
-        "formatString": "{1}",
-        "sourceType": "ModSettingFloat"
-      }
-    },
-    {
-      "id": "fSkirtGapNoBone:General",
-      "text": "$MSK_GapStiffText",
-      "help": "$MSK_GapStiffHelp",
-      "type": "slider",
-      "valueOptions": {
-        "min": 0,
-        "max": 10,
-        "step": 0.5,
-        "formatString": "{1}",
-        "sourceType": "ModSettingFloat"
-      }
+      "pageDisplayName": "$MSK_PageLegsText",
+      "cursorFillMode": "topToBottom",
+      "content": [
+        {
+          "text": "$MSK_LegsText",
+          "type": "header"
+        },
+        {
+          "id": "bReplaceLegs:General",
+          "text": "$MSK_ReplaceLegsText",
+          "help": "$MSK_ReplaceLegsHelp",
+          "type": "toggle",
+          "valueOptions": {
+            "sourceType": "ModSettingBool"
+          }
+        },
+        {
+          "id": "fBandTop:General",
+          "text": "$MSK_LegTopText",
+          "help": "$MSK_LegTopHelp",
+          "type": "slider",
+          "valueOptions": {
+            "min": 50,
+            "max": 90,
+            "step": 1,
+            "formatString": "{0}",
+            "sourceType": "ModSettingFloat"
+          }
+        },
+        {
+          "id": "bUnderwear:General",
+          "text": "$MSK_UnderwearText",
+          "help": "$MSK_UnderwearHelp",
+          "type": "toggle",
+          "valueOptions": {
+            "sourceType": "ModSettingBool"
+          }
+        },
+        {
+          "id": "fSkirtGap:General",
+          "text": "$MSK_GapText",
+          "help": "$MSK_GapHelp",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 8,
+            "step": 0.5,
+            "formatString": "{1}",
+            "sourceType": "ModSettingFloat"
+          }
+        },
+        {
+          "id": "fSkirtGapNoBone:General",
+          "text": "$MSK_GapStiffText",
+          "help": "$MSK_GapStiffHelp",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 10,
+            "step": 0.5,
+            "formatString": "{1}",
+            "sourceType": "ModSettingFloat"
+          }
+        }
+      ]
     }
   ]
 }
