@@ -344,6 +344,10 @@ namespace Overrides
 		if (!outfitKey.empty()) {
 			if (auto it = g_outfits.find(outfitKey); it != g_outfits.end()) {
 				ApplyRule(it->second, Source::kOutfit, out);
+				if (a_global.elderlyExcluded && out.enabled) {
+					out.enabled = false;
+					out.enabledSource = Source::kGlobal;
+				}
 			}
 		}
 

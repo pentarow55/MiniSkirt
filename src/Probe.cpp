@@ -745,19 +745,32 @@ namespace Probe
 			logger::info("女性 NPC（処理しない）: {} ({:08X}) {}", a_actor->GetDisplayFullName(), a_id, a_text);
 		}
 
-		// 年配の NPC か: 種族が Skyrim.esm の ElderRace (00067CD8) / ElderRaceVampire (000A82BA)、または EditorID が Elder で始まる種族（MOD の年配の種族）
+		// 年配の NPC か: 種族が Skyrim.esm の ElderRace (00067CD8) / ElderRaceVampire (000A82BA)、または EditorID が Elder で始まる種族（MOD の年配の種族）、
+		// またはボイスタイプが Skyrim.esm の FemaleOldKindly (00013AE1) / FemaleOldGrumpy (00013AE2)
 		bool IsElderly(RE::Actor* a_actor)
 		{
-			auto race = a_actor->GetRace();
-			if (!race) {
+			if (!a_actor) {
 				return false;
 			}
-			const auto id = race->GetFormID();
-			if (id == 0x00067CD8 || id == 0x000A82BA) {
-				return true;
+			if (auto race = a_actor->GetRace()) {
+				const auto id = race->GetFormID();
+				if (id == 0x00067CD8 || id == 0x000A82BA) {
+					return true;
+				}
+				const char* edid = race->GetFormEditorID();
+				if (edid && _strnicmp(edid, "Elder", 5) == 0) {
+					return true;
+				}
 			}
-			const char* edid = race->GetFormEditorID();
-			return edid && _strnicmp(edid, "Elder", 5) == 0;
+			if (auto base = a_actor->GetActorBase()) {
+				if (auto voice = base->GetVoiceType()) {
+					const auto vid = voice->GetFormID();
+					if (vid == 0x00013AE1 || vid == 0x00013AE2) {
+						return true;
+					}
+				}
+			}
+			return false;
 		}
 
 		void Later(int a_ms, std::function<void()> a_fn);

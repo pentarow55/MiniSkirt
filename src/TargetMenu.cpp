@@ -922,7 +922,7 @@ namespace TargetMenu
 				scopeEnabled = !r || !r->enabled.has_value() || *r->enabled;
 			} else if (a_scope == Scope::kNpc) {
 				const auto r = Overrides::GetNpcRule(actor);
-				scopeEnabled = r ? (!r->enabled.has_value() || *r->enabled) : res.enabled;
+				scopeEnabled = (r && r->enabled.has_value()) ? *r->enabled : res.enabled;
 			}
 
 			const std::string body = std::format("{}\n{}", Tr("$MSK_MenuMoreTitle", "More Settings"), TargetHeader(actor, armor, a_scope));
@@ -1257,7 +1257,7 @@ namespace TargetMenu
 		const auto armRule = Overrides::GetOutfitRule(armor);
 		const bool npcOverride = npcRule.has_value();
 		const bool armOverride = armRule.has_value();
-		const bool npcApply = npcOverride ? (!npcRule->enabled.has_value() || *npcRule->enabled) : res.enabled;
+		const bool npcApply = (npcOverride && npcRule->enabled.has_value()) ? *npcRule->enabled : res.enabled;
 		const bool armApply = armOverride ? (!armRule->enabled.has_value() || *armRule->enabled) : true;
 
 		enum class Act
