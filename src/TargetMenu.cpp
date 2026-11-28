@@ -615,10 +615,20 @@ namespace TargetMenu
 			const auto cutStr = res.hemStyle == 0 ? Tr("$MSK_CutOptRoughText", "Rough") : Tr("$MSK_CutOptLevelText", "Level");
 			const bool elderlyExcl = Probe::GlobalExcludeElderly();
 
+			bool scopeEnabled = gdef.enabled;
+			if (a_scope == Scope::kOutfit) {
+				const auto r = Overrides::GetOutfitRule(armor);
+				scopeEnabled = !r || !r->enabled.has_value() || *r->enabled;
+			} else if (a_scope == Scope::kNpc) {
+				const auto r = Overrides::GetNpcRule(actor);
+				scopeEnabled = r ? (!r->enabled.has_value() || *r->enabled) : res.enabled;
+			}
+
 			const std::string body = std::format("{}\n{}", Tr("$MSK_MenuMoreTitle", "More Settings"), TargetHeader(actor, armor, a_scope));
 
 			enum class DAct
 			{
+				kEnableMod,
 				kCut,
 				kHip,
 				kFlare,
@@ -632,36 +642,55 @@ namespace TargetMenu
 			std::vector<std::string> buttons;
 			std::vector<DAct>        actions;
 
-			buttons.push_back(std::format("{}: {} [{}]", Tr("$MSK_CutStyleText", "Hem Cut Style"), cutStr, SourceLabel(res.hemStyleSource)));
-			actions.push_back(DAct::kCut);
-			buttons.push_back(std::format("{}: {:.1f} [{}]...", Tr("$MSK_HipEaseText", "Hip Ease"), res.hipEase, SourceLabel(res.hipEaseSource)));
-			actions.push_back(DAct::kHip);
-			buttons.push_back(std::format("{}: {:.0f}° [{}]...", Tr("$MSK_FlareText", "Flare Angle"), res.flareAngle, SourceLabel(res.flareAngleSource)));
-			actions.push_back(DAct::kFlare);
-			buttons.push_back(std::format("[{}] {} [{}]", res.underwear ? "x" : " ", Tr("$MSK_UnderwearText", "Wear Underwear"), SourceLabel(res.underwearSource)));
-			actions.push_back(DAct::kUnderwear);
-			buttons.push_back(std::format("{}: {:.1f} [{}]...", Tr("$MSK_GapText", "Skirt / Leg Gap"), res.skirtGap, SourceLabel(res.skirtGapSource)));
-			actions.push_back(DAct::kGap);
-			buttons.push_back(std::format("{}: {:.1f} [{}]...", Tr("$MSK_GapStiffText", "Gap (Stiff Skirts)"), res.skirtGapNoBone, SourceLabel(res.skirtGapNoBoneSource)));
-			actions.push_back(DAct::kGapStiff);
+			buttons.push_back(std::format("[{}] {}", scopeEnabled ? "x" : " ", Tr("$MSK_MenuBtnApply", "Enable MiniSkirt Mod")));
+			actions.push_back(DAct::kEnableMod);
 
-			if (a_scope == Scope::kGlobal) {
-				buttons.push_back(std::format("[{}] {}", elderlyExcl ? "x" : " ", Tr("$MSK_ElderlyText", "Exclude Elderly Women")));
-				actions.push_back(DAct::kElderly);
-			} else {
-				buttons.push_back(Tr("$MSK_MenuBtnResetMore", "Reset Detail Settings"));
-				actions.push_back(DAct::kReset);
+			if (scopeEnabled) {
+				buttons.push_back(std::format("{}: {} ({})", Tr("$MSK_CutStyleText", "Hem Cut Style"), cutStr, SourceLabel(res.hemStyleSource)));
+				actions.push_back(DAct::kCut);
+				buttons.push_back(std::format("{}: {:.1f} ({})...", Tr("$MSK_HipEaseText", "Hip Ease"), res.hipEase, SourceLabel(res.hipEaseSource)));
+				actions.push_back(DAct::kHip);
+				buttons.push_back(std::format("{}: {:.0f}° ({})...", Tr("$MSK_FlareText", "Flare Angle"), res.flareAngle, SourceLabel(res.flareAngleSource)));
+				actions.push_back(DAct::kFlare);
+				buttons.push_back(std::format("[{}] {} ({})", res.underwear ? "x" : " ", Tr("$MSK_UnderwearText", "Wear Underwear"), SourceLabel(res.underwearSource)));
+				actions.push_back(DAct::kUnderwear);
+				buttons.push_back(std::format("{}: {:.1f} ({})...", Tr("$MSK_GapText", "Skirt / Leg Gap"), res.skirtGap, SourceLabel(res.skirtGapSource)));
+				actions.push_back(DAct::kGap);
+				buttons.push_back(std::format("{}: {:.1f} ({})...", Tr("$MSK_GapStiffText", "Gap (Stiff Skirts)"), res.skirtGapNoBone, SourceLabel(res.skirtGapNoBoneSource)));
+				actions.push_back(DAct::kGapStiff);
+
+				if (a_scope == Scope::kGlobal) {
+					buttons.push_back(std::format("[{}] {}", elderlyExcl ? "x" : " ", Tr("$MSK_ElderlyText", "Exclude Elderly Women")));
+					actions.push_back(DAct::kElderly);
+				} else {
+					buttons.push_back(Tr("$MSK_MenuBtnResetMore", "Reset Detail Settings"));
+					actions.push_back(DAct::kReset);
+				}
 			}
 			buttons.push_back(Tr("$MSK_MenuBtnBack", "Back"));
 			actions.push_back(DAct::kBack);
 
-			ShowMenu(body, buttons, [a_actorId, a_armorId, a_scope, curCut = res.hemStyle, curUw = res.underwear, elderlyExcl, actions](std::int32_t a_idx) {
+			ShowMenu(body, buttons, [a_actorId, a_armorId, a_scope, scopeEnabled, curCut = res.hemStyle, curUw = res.underwear, elderlyExcl, actions](std::int32_t a_idx) {
 				if (a_idx < 0 || static_cast<std::size_t>(a_idx) >= actions.size()) {
 					return;
 				}
 				auto act = a_actorId ? RE::TESForm::LookupByID<RE::Actor>(a_actorId) : nullptr;
 				auto arm = a_armorId ? RE::TESForm::LookupByID<RE::TESObjectARMO>(a_armorId) : nullptr;
 				switch (actions[static_cast<std::size_t>(a_idx)]) {
+				case DAct::kEnableMod: {
+					const bool nextEn = !scopeEnabled;
+					if (a_scope == Scope::kGlobal) {
+						Probe::UpdateGlobalSetting("bEnabled", nextEn ? "1" : "0");
+					} else if (a_scope == Scope::kNpc && act) {
+						Overrides::SetNpcEnabled(act, nextEn);
+						ApplyReprocess(a_actorId, a_armorId, a_scope);
+					} else if (a_scope == Scope::kOutfit && arm) {
+						Overrides::SetOutfitEnabled(arm, nextEn);
+						ApplyReprocess(a_actorId, a_armorId, a_scope);
+					}
+					OpenDetailSubMenu(a_actorId, a_armorId, a_scope);
+					break;
+				}
 				case DAct::kCut: {
 					const int nextCut = curCut == 0 ? 1 : 0;
 					if (a_scope == Scope::kGlobal) {
@@ -743,14 +772,12 @@ namespace TargetMenu
 		{
 			const auto        gdef = Probe::GetGlobalDefaults(nullptr);
 			const std::string status = gdef.enabled ?
-			                               std::format("{} ({:.0f}%)", Tr("$MSK_MenuEnabled", "Enabled"), gdef.lengthPct) :
-			                               Tr("$MSK_MenuExcluded", "Excluded");
-			const std::string body = std::format("{}\n{}: {}", Tr("$MSK_MenuGlobalTitle", "Settings for All (Global)"),
-				Tr("$MSK_MenuCurrentLabel", "Current"), status);
+			                               std::format("{}: {:.0f}%", Tr("$MSK_MenuLenLabel", "Length"), gdef.lengthPct) :
+			                               Tr("$MSK_MenuExcluded", "Off");
+			const std::string body = std::format("{}\n{}", Tr("$MSK_MenuGlobalTitle", "Settings for All (Global)"), status);
 
 			enum class GAct
 			{
-				kApply,
 				kLen,
 				kMore,
 				kExit,
@@ -758,26 +785,20 @@ namespace TargetMenu
 			std::vector<std::string> buttons;
 			std::vector<GAct>        actions;
 
-			buttons.push_back(std::format("[{}] {}", gdef.enabled ? "x" : " ", Tr("$MSK_MenuBtnApply", "Apply MiniSkirt")));
-			actions.push_back(GAct::kApply);
 			if (gdef.enabled) {
-				buttons.push_back(std::format("    - {}", Tr("$MSK_MenuBtnSubLen", "Adjust Length...")));
+				buttons.push_back(Tr("$MSK_MenuBtnSubLen", "Adjust Length..."));
 				actions.push_back(GAct::kLen);
-				buttons.push_back(std::format("    - {}", Tr("$MSK_MenuBtnSubMore", "More Settings...")));
-				actions.push_back(GAct::kMore);
 			}
+			buttons.push_back(Tr("$MSK_MenuBtnSubMore", "More Settings..."));
+			actions.push_back(GAct::kMore);
 			buttons.push_back(a_returnActorId ? Tr("$MSK_MenuBtnBack", "Back") : Tr("$MSK_MenuBtnClose", "Close"));
 			actions.push_back(GAct::kExit);
 
-			ShowMenu(body, buttons, [a_returnActorId, enabled = gdef.enabled, actions](std::int32_t a_idx) {
+			ShowMenu(body, buttons, [a_returnActorId, actions](std::int32_t a_idx) {
 				if (a_idx < 0 || static_cast<std::size_t>(a_idx) >= actions.size()) {
 					return;
 				}
 				switch (actions[static_cast<std::size_t>(a_idx)]) {
-				case GAct::kApply:
-					Probe::UpdateGlobalSetting("bEnabled", enabled ? "0" : "1");
-					OpenGlobalMenu(a_returnActorId);
-					break;
 				case GAct::kLen:
 					OpenLengthSubMenu(a_returnActorId, 0, Scope::kGlobal);
 					break;
@@ -915,11 +936,10 @@ namespace TargetMenu
 
 		const auto        res = Overrides::Resolve(a_actor, armor, gdef);
 		const std::string status = res.enabled ?
-		                               std::format("{} ({:.0f}% [{}])", Tr("$MSK_MenuEnabled", "Enabled"), res.lengthPct, SourceLabel(res.lengthSource)) :
-		                               std::format("{} ([{}])", Tr("$MSK_MenuExcluded", "Excluded"), SourceLabel(res.enabledSource));
+		                               std::format("{}: {:.0f}% ({})", Tr("$MSK_MenuLenLabel", "Length"), res.lengthPct, SourceLabel(res.lengthSource)) :
+		                               std::format("{} ({})", Tr("$MSK_MenuExcluded", "Off"), SourceLabel(res.enabledSource));
 
-		const std::string body = std::format("MiniSkirt: {}\n{}: {}\n{}: {}", npcName, Tr("$MSK_MenuOutfitLabel", "Outfit"), armName,
-			Tr("$MSK_MenuCurrentLabel", "Current"), status);
+		const std::string body = std::format("MiniSkirt: {}\n{}: {}\n{}", npcName, Tr("$MSK_MenuOutfitLabel", "Outfit"), armName, status);
 
 		const auto npcRule = Overrides::GetNpcRule(a_actor);
 		const auto armRule = Overrides::GetOutfitRule(armor);
@@ -932,11 +952,9 @@ namespace TargetMenu
 		{
 			kGlobal,
 			kOutOverride,
-			kOutApply,
 			kOutLen,
 			kOutMore,
 			kNpcOverride,
-			kNpcApply,
 			kNpcLen,
 			kNpcMore,
 			kClose,
@@ -944,7 +962,6 @@ namespace TargetMenu
 		std::vector<std::string> buttons;
 		std::vector<Act>         actions;
 
-		const std::string applyLabel = Tr("$MSK_MenuBtnApply", "Apply MiniSkirt");
 		const std::string subLen = std::format("    - {}", Tr("$MSK_MenuBtnSubLen", "Adjust Length..."));
 		const std::string subMore = std::format("    - {}", Tr("$MSK_MenuBtnSubMore", "More Settings..."));
 
@@ -956,35 +973,31 @@ namespace TargetMenu
 			buttons.push_back(std::format("[{}] {}", armOverride ? "x" : " ", Tr("$MSK_MenuBtnOutOverride", "Override for this Outfit")));
 			actions.push_back(Act::kOutOverride);
 			if (armOverride) {
-				buttons.push_back(std::format("    - [{}] {}", armApply ? "x" : " ", applyLabel));
-				actions.push_back(Act::kOutApply);
 				if (armApply) {
 					buttons.push_back(subLen);
 					actions.push_back(Act::kOutLen);
-					buttons.push_back(subMore);
-					actions.push_back(Act::kOutMore);
 				}
+				buttons.push_back(subMore);
+				actions.push_back(Act::kOutMore);
 			}
 		}
 
 		buttons.push_back(std::format("[{}] {}", npcOverride ? "x" : " ", Tr("$MSK_MenuBtnNpcOverride", "Override for this NPC")));
 		actions.push_back(Act::kNpcOverride);
 		if (npcOverride) {
-			buttons.push_back(std::format("    - [{}] {}", npcApply ? "x" : " ", applyLabel));
-			actions.push_back(Act::kNpcApply);
 			if (npcApply) {
 				buttons.push_back(subLen);
 				actions.push_back(Act::kNpcLen);
-				buttons.push_back(subMore);
-				actions.push_back(Act::kNpcMore);
 			}
+			buttons.push_back(subMore);
+			actions.push_back(Act::kNpcMore);
 		}
 
 		buttons.push_back(Tr("$MSK_MenuBtnClose", "Close"));
 		actions.push_back(Act::kClose);
 
 		const bool curEffective = res.enabled;
-		ShowMenu(body, buttons, [actorId, armorId, npcOverride, armOverride, npcApply, armApply, curEffective, actions](std::int32_t a_idx) {
+		ShowMenu(body, buttons, [actorId, armorId, npcOverride, armOverride, curEffective, actions](std::int32_t a_idx) {
 			if (a_idx < 0 || static_cast<std::size_t>(a_idx) >= actions.size()) {
 				return;
 			}
@@ -1008,13 +1021,6 @@ namespace TargetMenu
 				}
 				OpenForActor(act);
 				break;
-			case Act::kOutApply:
-				if (arm) {
-					Overrides::SetOutfitEnabled(arm, !armApply);
-					Probe::ReprocessByArmorNow(armorId);
-				}
-				OpenForActor(act);
-				break;
 			case Act::kOutLen:
 				OpenLengthSubMenu(actorId, armorId, Scope::kOutfit);
 				break;
@@ -1028,11 +1034,6 @@ namespace TargetMenu
 				} else {
 					Overrides::SetNpcEnabled(act, curEffective);
 				}
-				OpenForActor(act);
-				break;
-			case Act::kNpcApply:
-				Overrides::SetNpcEnabled(act, !npcApply);
-				Probe::ReprocessActorNow(actorId);
 				OpenForActor(act);
 				break;
 			case Act::kNpcLen:
