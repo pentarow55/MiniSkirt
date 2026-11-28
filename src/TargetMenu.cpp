@@ -152,25 +152,54 @@ namespace TargetMenu
 
 		// ---- ネイティブ選択肢メッセージボックス（MiniSkirt のメニューだけ左寄せ表示＋選択位置維持） ----
 		constexpr double           kMenuShiftLeft = 360.0;
+		constexpr std::string_view kCursorHoldMenuName = "MiniSkirtCursorHold";
 		std::atomic<bool>          g_ourMenuActive{ false };
 		std::atomic<int>           g_initialFocus{ 0 };
 		std::atomic<bool>          g_pauseHold{ false };
+		std::atomic<bool>          g_cursorHold{ false };
 		std::atomic<bool>          g_transitionExpected{ false };
 		std::atomic<std::uint64_t> g_pauseGen{ 0 };
 		double                     g_origMenuX = -99999.0;
 
+		// メニュー切り替えの 1 フレーム間に CursorMenu が閉じて再生成（一瞬中央へ飛ぶ現象）されるのを防ぐ透明メニュー
+		class CursorHoldMenu : public RE::IMenu
+		{
+		public:
+			CursorHoldMenu()
+			{
+				depthPriority = 0;
+				inputContext = Context::kNone;
+				menuFlags.set(Flag::kUsesCursor);
+			}
+
+			static RE::IMenu* Create() { return new CursorHoldMenu(); }
+		};
+
 		void AcquirePauseHold()
 		{
-			if (g_pauseHold.exchange(true)) {
-				return;
+			if (!g_pauseHold.exchange(true)) {
+				if (auto ui = RE::UI::GetSingleton()) {
+					++ui->numPausesGame;
+				}
 			}
-			if (auto ui = RE::UI::GetSingleton()) {
-				++ui->numPausesGame;
+			if (!REL::Module::IsVR() && !g_cursorHold.load()) {
+				auto idm = RE::BSInputDeviceManager::GetSingleton();
+				if (!idm || !idm->IsGamepadEnabled()) {
+					if (auto mq = RE::UIMessageQueue::GetSingleton()) {
+						g_cursorHold.store(true);
+						mq->AddMessage(kCursorHoldMenuName, RE::UI_MESSAGE_TYPE::kShow, nullptr);
+					}
+				}
 			}
 		}
 
 		void ReleasePauseHold()
 		{
+			if (g_cursorHold.exchange(false)) {
+				if (auto mq = RE::UIMessageQueue::GetSingleton()) {
+					mq->AddMessage(kCursorHoldMenuName, RE::UI_MESSAGE_TYPE::kHide, nullptr);
+				}
+			}
 			if (!g_pauseHold.exchange(false)) {
 				return;
 			}
@@ -1162,6 +1191,9 @@ namespace TargetMenu
 		EnsureTranslations();
 
 		if (auto ui = RE::UI::GetSingleton()) {
+			if (!REL::Module::IsVR()) {
+				ui->Register(kCursorHoldMenuName, CursorHoldMenu::Create);
+			}
 			ui->AddEventSink<RE::MenuOpenCloseEvent>(&g_menuSink);
 		}
 		if (auto idm = RE::BSInputDeviceManager::GetSingleton()) {
