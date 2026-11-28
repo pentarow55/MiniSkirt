@@ -797,21 +797,24 @@ namespace TargetMenu
 		std::vector<std::string> buttons;
 		std::vector<Act>         actions;
 
-		buttons.push_back(std::format("[{}] {}", npcOn ? "x" : " ", Tr("$MSK_MenuBtnNpcToggle", "NPC: MiniSkirt")));
+		const std::string subLen = std::format("    - {}", Tr("$MSK_MenuBtnSubLen", "Adjust Length..."));
+		const std::string subMore = std::format("    - {}", Tr("$MSK_MenuBtnSubMore", "More Settings..."));
+
+		buttons.push_back(std::format("[{}] {}", npcOn ? "x" : " ", Tr("$MSK_MenuBtnNpcToggle", "Enable for this NPC")));
 		actions.push_back(Act::kNpcToggle);
 		if (npcOn) {
-			buttons.push_back(Tr("$MSK_MenuBtnNpcLen", "NPC: Adjust Length..."));
+			buttons.push_back(subLen);
 			actions.push_back(Act::kNpcLen);
-			buttons.push_back(Tr("$MSK_MenuBtnNpcMore", "NPC: More Settings..."));
+			buttons.push_back(subMore);
 			actions.push_back(Act::kNpcMore);
 		}
 		if (armor) {
-			buttons.push_back(std::format("[{}] {}", armOn ? "x" : " ", Tr("$MSK_MenuBtnOutToggle", "Outfit: MiniSkirt")));
+			buttons.push_back(std::format("[{}] {}", armOn ? "x" : " ", Tr("$MSK_MenuBtnOutToggle", "Enable for this Outfit")));
 			actions.push_back(Act::kOutToggle);
 			if (armOn) {
-				buttons.push_back(Tr("$MSK_MenuBtnOutLen", "Outfit: Adjust Length..."));
+				buttons.push_back(subLen);
 				actions.push_back(Act::kOutLen);
-				buttons.push_back(Tr("$MSK_MenuBtnOutMore", "Outfit: More Settings..."));
+				buttons.push_back(subMore);
 				actions.push_back(Act::kOutMore);
 			}
 		}
