@@ -1287,52 +1287,71 @@ namespace Probe
 			}
 		}
 
-		// Data/MCM/Settings/MiniSkirt.ini の [General] セクションに key = val を書き込む（他セクションはそのまま保持）
+		// Data/MCM/Settings/MiniSkirt.ini の [General] セクションに key = val を書き込む（BOM・重複セクションにも対応し、他セクションは保持）
 		void WriteMcmIniKey(const std::string& a_key, const std::string& a_val)
 		{
 			std::vector<std::string> lines;
 			{
-				std::ifstream in(kMcmSettings);
+				std::ifstream in(kMcmSettings, std::ios::binary);
 				std::string   line;
+				bool          first = true;
 				while (std::getline(in, line)) {
+					if (first) {
+						first = false;
+						if (line.size() >= 3 && static_cast<unsigned char>(line[0]) == 0xEF && static_cast<unsigned char>(line[1]) == 0xBB &&
+						    static_cast<unsigned char>(line[2]) == 0xBF) {
+							line.erase(0, 3);
+						}
+					}
 					if (!line.empty() && line.back() == '\r') {
 						line.pop_back();
 					}
 					lines.push_back(std::move(line));
 				}
 			}
-			int  genStart = -1;
-			int  genEnd = static_cast<int>(lines.size());
-			bool replaced = false;
-			for (int i = 0; i < static_cast<int>(lines.size()); ++i) {
-				const auto t = Trim(lines[i]);
+			// 既存の [General] すべてから同じ key を取り除き、最初の [General] 末尾へ 1 つだけ書く
+			std::vector<std::string> cleaned;
+			bool                     inGeneral = false;
+			int                      firstGenEnd = -1;
+			bool                     seenGeneral = false;
+			for (const auto& l : lines) {
+				const auto t = Trim(l);
 				if (!t.empty() && t.front() == '[' && t.back() == ']') {
-					if (genStart >= 0) {
-						genEnd = i;
-						break;
+					if (inGeneral && firstGenEnd < 0) {
+						firstGenEnd = static_cast<int>(cleaned.size());
 					}
-					if (_stricmp(t.c_str(), "[General]") == 0) {
-						genStart = i;
+					inGeneral = _stricmp(t.c_str(), "[General]") == 0;
+					if (inGeneral) {
+						if (!seenGeneral) {
+							seenGeneral = true;
+							cleaned.push_back(l);
+						}
+						// 2 つ目以降の重複 [General] 見出しは落とす
+						continue;
 					}
-				} else if (genStart >= 0) {
+					cleaned.push_back(l);
+					continue;
+				}
+				if (inGeneral) {
 					const auto eq = t.find('=');
 					if (eq != std::string::npos && Trim(t.substr(0, eq)) == a_key) {
-						lines[i] = std::format("{} = {}", a_key, a_val);
-						replaced = true;
-						break;
+						continue;  // 同じキーはすべて除去して新しい値 1 つに統一
 					}
 				}
+				cleaned.push_back(l);
 			}
-			if (!replaced) {
-				if (genStart < 0) {
-					if (!lines.empty() && !lines.back().empty()) {
-						lines.emplace_back();
-					}
-					lines.emplace_back("[General]");
-					lines.push_back(std::format("{} = {}", a_key, a_val));
-				} else {
-					lines.insert(lines.begin() + genEnd, std::format("{} = {}", a_key, a_val));
+			if (inGeneral && firstGenEnd < 0) {
+				firstGenEnd = static_cast<int>(cleaned.size());
+			}
+			const std::string entry = std::format("{} = {}", a_key, a_val);
+			if (!seenGeneral) {
+				if (!cleaned.empty() && !cleaned.back().empty()) {
+					cleaned.emplace_back();
 				}
+				cleaned.emplace_back("[General]");
+				cleaned.push_back(entry);
+			} else {
+				cleaned.insert(cleaned.begin() + firstGenEnd, entry);
 			}
 			std::filesystem::path p(kMcmSettings);
 			if (p.has_parent_path()) {
@@ -1340,7 +1359,7 @@ namespace Probe
 				std::filesystem::create_directories(p.parent_path(), ec);
 			}
 			std::ofstream out(p, std::ios::binary | std::ios::trunc);
-			for (const auto& l : lines) {
+			for (const auto& l : cleaned) {
 				out << l << "\r\n";
 			}
 		}
