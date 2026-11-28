@@ -965,26 +965,30 @@ namespace Skirt
 					const float d = zStart - p.z;
 					const float u = (std::clamp)(d / span, 0.0f, 1.0f);
 
-					// 1) お尻の丸い体の外形ベース（zStart からお尻の山 ZB まで滑らかに張り出し、その下は山幅を保つ）＋直線フレア
+					// 1) ウエストからの直線（赤線）と、お尻の外形から広がる線の大きい方を Curve shape = 0 の基準にする
+					//    - 広がりが小さいとき: お尻の丸みに沿って自然に落ちる（脚が突き抜けない）
+					//    - 広がりが大きいとき: ウエストからすそへの直線（余計なお尻の膨らみを足さない）
 					const float rPeak = (std::max)(rStart, RB + a_ease);
-					float       rHip = rPeak;
+					float       rHip = rStart;
 					if (zStart > ZB + 1.0f) {
 						const float tHip = (std::clamp)((zStart - p.z) / (zStart - ZB), 0.0f, 1.0f);
 						const float sHip = tHip * tHip * (3.0f - 2.0f * tHip);
 						rHip = rStart + (rPeak - rStart) * sHip;
-					} else {
-						rHip = rStart;
 					}
 					if (p.z < a_top) {
 						rHip = (std::max)(rHip, rBody);
 					}
-					const float rZero = rHip + slope * d;
+					const float dBelowHip = (std::max)(ZB - p.z, 0.0f);
+					const float rLineWaist = rStart + slope * d;
+					const float rLineHip = rHip + slope * dBelowHip;
+					const float kBlend = (std::min)(d * 0.25f, 1.5f);
+					const float rZero = kBlend > 1e-3f ? smoothMax(rLineWaist, rLineHip, kBlend) : (std::max)(rLineWaist, rLineHip);
 
 					// 2) カーブ成分（u=0 と u=1 で厳密に 0 なので、開始点もすその幅も変わらない）
 					const float uBias = u > 1e-5f ? std::pow(u, biasExp) : 0.0f;
 					const float sPi = std::sin(kPi * uBias);
 					const float bulge = sPi * sPi;
-					const float maxBulge = (std::min)(span * 0.30f, 10.0f);
+					const float maxBulge = (std::min)(span * 0.35f, 12.0f);
 					const float raw = rZero + curveNorm * maxBulge * bulge;
 
 					rt = p.z < a_top ? smoothMax(raw, rBody, 0.8f) : (std::max)(raw, r0);
