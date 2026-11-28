@@ -36,7 +36,7 @@ namespace Probe
 			bool  apply{ true };
 			bool  enabled{ true };         // MCM の「有効」。無効にすると全員を元のロングに戻して帯を外す
 			float waist{ 70.0f };
-			float lengthPct{ 24.0f };      // スカート丈（ウエストバンドの上端を 0、標準の長いドレスのすそ（高さ 6）を 100 とした %。100 は元の長さのまま）
+			float lengthPct{ 40.0f };      // スカート丈（ウエストバンドの上端を 0、標準の長いドレスのすそ（高さ 6）を 100 とした %。100 は元の長さのまま）
 			float hem{ 65.0f };            // 縮めたあとのすその高さ（足元 0・頭のてっぺん ≒ 128）。lengthPct から求める
 			bool  excludeElderly{ false }; // 年配の女性（種族が Elder）は何もしない
 			float hipEase{ 1.0f };         // A ライン: お尻まわりのゆとり（帯の体のいちばん外からの幅）
@@ -60,7 +60,7 @@ namespace Probe
 			bool  learnAdjustPower{ false };  // VR・パッド向けの調整パワーを習得する
 		};
 		Cfg g_cfg;
-		float g_curLengthPct{ 24.0f };  // 現在処理中の NPC に適用するスカート丈（%）
+		float g_curLengthPct{ 40.0f };  // 現在処理中の NPC に適用するスカート丈（%）
 		float g_curHem{ 65.0f };        // 現在処理中の NPC に適用するすその高さ
 		int   g_curHemStyle{ 1 };       // 現在処理中の NPC に適用する裾の切り方
 
@@ -774,7 +774,7 @@ namespace Probe
 			RE::TESObjectARMO*            armor{ nullptr };
 			std::string                   who;
 			std::uint64_t                 token{ 0 };
-			float                         lengthPct{ 30.0f };
+			float                         lengthPct{ 40.0f };
 			float                         hem{ 56.4f };
 			int                           hemStyle{ 1 };
 			float                         hipEase{ 1.0f };

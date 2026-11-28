@@ -526,7 +526,7 @@ namespace TargetMenu
 				return;
 			}
 
-			int         curPct = 30;
+			int         curPct = 40;
 			std::string srcStr = SourceLabel(Overrides::Source::kGlobal);
 			if (a_scope == Scope::kGlobal) {
 				const auto gdef = Probe::GetGlobalDefaults(nullptr);
@@ -560,7 +560,7 @@ namespace TargetMenu
 					auto arm = a_armorId ? RE::TESForm::LookupByID<RE::TESObjectARMO>(a_armorId) : nullptr;
 					auto applyLen = [&](std::optional<float> v) {
 						if (a_scope == Scope::kGlobal) {
-							const float gval = v.value_or(30.0f);
+							const float gval = v.value_or(40.0f);
 							Probe::UpdateGlobalSetting("fSkirtLength", std::format("{:.6f}", gval));
 						} else if (a_scope == Scope::kNpc && act) {
 							Overrides::SetNpcLength(act, v);

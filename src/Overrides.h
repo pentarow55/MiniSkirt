@@ -41,7 +41,7 @@ namespace Overrides
 	{
 		bool  enabled{ true };
 		bool  elderlyExcluded{ false };
-		float lengthPct{ 30.0f };
+		float lengthPct{ 40.0f };
 		int   hemStyle{ 1 };
 		float hipEase{ 1.0f };
 		float flareAngle{ 5.0f };
@@ -57,7 +57,7 @@ namespace Overrides
 	struct Resolved
 	{
 		bool   enabled{ true };
-		float  lengthPct{ 30.0f };
+		float  lengthPct{ 40.0f };
 		int    hemStyle{ 1 };
 		float  hipEase{ 1.0f };
 		float  flareAngle{ 5.0f };
