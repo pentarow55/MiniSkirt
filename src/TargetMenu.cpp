@@ -151,10 +151,54 @@ namespace TargetMenu
 		}
 
 		// ---- ネイティブ選択肢メッセージボックス（MiniSkirt のメニューだけ左寄せ表示＋選択位置維持） ----
-		constexpr double  kMenuShiftLeft = 360.0;
-		std::atomic<bool> g_ourMenuActive{ false };
-		std::atomic<int>  g_initialFocus{ 0 };
-		double            g_origMenuX = -99999.0;
+		constexpr double           kMenuShiftLeft = 360.0;
+		std::atomic<bool>          g_ourMenuActive{ false };
+		std::atomic<int>           g_initialFocus{ 0 };
+		std::atomic<bool>          g_pauseHold{ false };
+		std::atomic<bool>          g_transitionExpected{ false };
+		std::atomic<std::uint64_t> g_pauseGen{ 0 };
+		double                     g_origMenuX = -99999.0;
+
+		void AcquirePauseHold()
+		{
+			if (g_pauseHold.exchange(true)) {
+				return;
+			}
+			if (auto ui = RE::UI::GetSingleton()) {
+				++ui->numPausesGame;
+			}
+		}
+
+		void ReleasePauseHold()
+		{
+			if (!g_pauseHold.exchange(false)) {
+				return;
+			}
+			g_pauseGen.fetch_add(1);
+			if (auto ui = RE::UI::GetSingleton(); ui && ui->numPausesGame > 0) {
+				--ui->numPausesGame;
+			}
+		}
+
+		void SchedulePauseFailsafe()
+		{
+			const auto gen = g_pauseGen.fetch_add(1) + 1;
+			std::thread([gen] {
+				std::this_thread::sleep_for(std::chrono::milliseconds(400));
+				if (g_pauseHold.load() && g_pauseGen.load() == gen) {
+					if (auto tasks = SKSE::GetTaskInterface()) {
+						tasks->AddUITask([gen] {
+							if (g_pauseHold.load() && g_pauseGen.load() == gen) {
+								auto ui = RE::UI::GetSingleton();
+								if (!ui || !ui->IsMenuOpen(RE::MessageBoxMenu::MENU_NAME)) {
+									ReleasePauseHold();
+								}
+							}
+						});
+					}
+				}
+			}).detach();
+		}
 
 		void ApplyMenuFocus(RE::GFxMovieView* a_movie, int a_idx)
 		{
@@ -235,11 +279,25 @@ namespace TargetMenu
 				if (a_event->opening) {
 					const bool ours = g_ourMenuActive.load();
 					const int  focus = ours ? g_initialFocus.load() : 0;
+					g_pauseGen.fetch_add(1);
+					if (ours) {
+						g_transitionExpected.store(false);
+					}
 					ScheduleApplyOffset(ours, focus);
 				} else {
 					g_ourMenuActive.store(false);
 					g_initialFocus.store(0);
 					ApplyMenuOffset(false, 0);
+					if (g_pauseHold.load()) {
+						if (auto tasks = SKSE::GetTaskInterface()) {
+							tasks->AddUITask([] {
+								if (g_pauseHold.load() && !g_transitionExpected.load() && !g_ourMenuActive.load()) {
+									ReleasePauseHold();
+								}
+							});
+						}
+						SchedulePauseFailsafe();
+					}
 				}
 				return RE::BSEventNotifyControl::kContinue;
 			}
@@ -252,8 +310,14 @@ namespace TargetMenu
 
 			void Run(std::uint8_t a_button) override
 			{
+				g_transitionExpected.store(false);
 				if (_fn) {
 					_fn(static_cast<std::int32_t>(a_button));
+				}
+				if (!g_transitionExpected.load()) {
+					ReleasePauseHold();
+				} else {
+					SchedulePauseFailsafe();
 				}
 			}
 
@@ -267,18 +331,26 @@ namespace TargetMenu
 			if (!tasks) {
 				return;
 			}
+			g_transitionExpected.store(true);
+			g_pauseGen.fetch_add(1);
 			tasks->AddUITask([a_body, a_buttons, a_onSelect = std::move(a_onSelect), a_focusIdx]() mutable {
 				auto factory = RE::MessageDataFactoryManager::GetSingleton();
 				auto uiStr = RE::InterfaceStrings::GetSingleton();
 				if (!factory || !uiStr) {
+					g_transitionExpected.store(false);
+					ReleasePauseHold();
 					return;
 				}
 				auto creator = factory->GetCreator<RE::MessageBoxData>(uiStr->messageBoxData);
 				if (!creator) {
+					g_transitionExpected.store(false);
+					ReleasePauseHold();
 					return;
 				}
 				auto msg = creator->Create();
 				if (!msg) {
+					g_transitionExpected.store(false);
+					ReleasePauseHold();
 					return;
 				}
 				msg->bodyText = a_body;
@@ -291,6 +363,7 @@ namespace TargetMenu
 				msg->isCancellable = true;
 				msg->cancelButtonIndex = static_cast<std::int32_t>(a_buttons.size()) - 1;
 				msg->callback = RE::make_smart<Callback>(std::move(a_onSelect));
+				AcquirePauseHold();
 				g_ourMenuActive.store(true);
 				g_initialFocus.store(a_focusIdx);
 				RE::MessageBoxMenu::QueueMessage(msg);
