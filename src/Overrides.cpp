@@ -39,6 +39,12 @@ namespace Overrides
 			if (a_r.flareAngle.has_value()) {
 				a_r.flareAngle = Round1(std::clamp(*a_r.flareAngle, 0.0f, 30.0f));
 			}
+			if (a_r.flareStart.has_value()) {
+				a_r.flareStart = Round1(std::clamp(*a_r.flareStart, 0.0f, 100.0f));
+			}
+			if (a_r.flareCurve.has_value()) {
+				a_r.flareCurve = Round1(std::clamp(*a_r.flareCurve, -10.0f, 20.0f));
+			}
 			if (a_r.skirtGap.has_value()) {
 				a_r.skirtGap = Round1(std::clamp(*a_r.skirtGap, 0.0f, 8.0f));
 			}
@@ -109,6 +115,12 @@ namespace Overrides
 				if (auto fa = v.find("flareAngle"); fa != v.end() && fa->is_number()) {
 					r.flareAngle = fa->get<float>();
 				}
+				if (auto fs = v.find("flareStart"); fs != v.end() && fs->is_number()) {
+					r.flareStart = fs->get<float>();
+				}
+				if (auto fc = v.find("flareCurve"); fc != v.end() && fc->is_number()) {
+					r.flareCurve = fc->get<float>();
+				}
 				if (auto uw = v.find("underwear"); uw != v.end() && uw->is_boolean()) {
 					r.underwear = uw->get<bool>();
 				}
@@ -150,6 +162,12 @@ namespace Overrides
 				}
 				if (r.flareAngle.has_value()) {
 					item["flareAngle"] = Round1(*r.flareAngle);
+				}
+				if (r.flareStart.has_value()) {
+					item["flareStart"] = Round1(*r.flareStart);
+				}
+				if (r.flareCurve.has_value()) {
+					item["flareCurve"] = Round1(*r.flareCurve);
 				}
 				if (r.underwear.has_value()) {
 					item["underwear"] = *r.underwear;
@@ -212,6 +230,14 @@ namespace Overrides
 			if (a_r.flareAngle.has_value()) {
 				a_out.flareAngle = *a_r.flareAngle;
 				a_out.flareAngleSource = a_src;
+			}
+			if (a_r.flareStart.has_value()) {
+				a_out.flareStart = *a_r.flareStart;
+				a_out.flareStartSource = a_src;
+			}
+			if (a_r.flareCurve.has_value()) {
+				a_out.flareCurve = *a_r.flareCurve;
+				a_out.flareCurveSource = a_src;
 			}
 			if (a_r.underwear.has_value()) {
 				a_out.underwear = *a_r.underwear;
@@ -279,6 +305,8 @@ namespace Overrides
 		out.hemStyle = std::clamp(a_global.hemStyle, 0, 1);
 		out.hipEase = std::clamp(a_global.hipEase, 0.0f, 8.0f);
 		out.flareAngle = std::clamp(a_global.flareAngle, 0.0f, 30.0f);
+		out.flareStart = std::clamp(a_global.flareStart, 0.0f, 100.0f);
+		out.flareCurve = std::clamp(a_global.flareCurve, -10.0f, 20.0f);
 		out.underwear = a_global.underwear;
 		out.skirtGap = std::clamp(a_global.skirtGap, 0.0f, 8.0f);
 		out.skirtGapNoBone = std::clamp(a_global.skirtGapNoBone, 0.0f, 10.0f);

@@ -444,11 +444,15 @@ namespace TargetMenu
 				};
 
 				if (a_idx >= 0 && a_idx < 6) {
-					const float nextPct = static_cast<float>(std::clamp(curPct + kDeltas[a_idx], 10, 100));
-					applyLen(nextPct);
+					const int nextPct = std::clamp(curPct + kDeltas[a_idx], 10, 100);
+					if (nextPct != curPct) {
+						applyLen(static_cast<float>(nextPct));
+					}
 					OpenLengthSubMenu(a_actorId, a_armorId, a_scope);
 				} else if (a_idx == 6) {
-					applyLen(100.0f);
+					if (curPct != 100) {
+						applyLen(100.0f);
+					}
 					OpenLengthSubMenu(a_actorId, a_armorId, a_scope);
 				} else if (hasReset && a_idx == 7) {
 					applyLen(std::nullopt);
@@ -467,6 +471,8 @@ namespace TargetMenu
 		{
 			kHipEase,
 			kFlareAngle,
+			kFlareStart,
+			kFlareCurve,
 			kSkirtGap,
 			kSkirtGapNoBone,
 		};
@@ -485,7 +491,8 @@ namespace TargetMenu
 			const char*       iniKey = "";
 			float             curVal = 0.0f;
 			float             minV = 0.0f, maxV = 8.0f, smallStep = 0.5f, bigStep = 1.0f;
-			bool              isIntDeg = false;
+			const char*       unit = "";
+			bool              isInt = false;
 			Overrides::Source src = Overrides::Source::kGlobal;
 
 			switch (a_field) {
@@ -500,7 +507,7 @@ namespace TargetMenu
 				bigStep = 1.0f;
 				break;
 			case FloatField::kFlareAngle:
-				title = Tr("$MSK_FlareText", "Flare Angle");
+				title = Tr("$MSK_FlareText", "Hem Flare");
 				iniKey = "fFlareAngle";
 				curVal = res.flareAngle;
 				src = res.flareAngleSource;
@@ -508,7 +515,30 @@ namespace TargetMenu
 				maxV = 30.0f;
 				smallStep = 1.0f;
 				bigStep = 5.0f;
-				isIntDeg = true;
+				unit = "°";
+				isInt = true;
+				break;
+			case FloatField::kFlareStart:
+				title = Tr("$MSK_FlareStartText", "Flare Start");
+				iniKey = "fFlareStart";
+				curVal = res.flareStart;
+				src = res.flareStartSource;
+				minV = 0.0f;
+				maxV = 100.0f;
+				smallStep = 5.0f;
+				bigStep = 20.0f;
+				unit = "%";
+				isInt = true;
+				break;
+			case FloatField::kFlareCurve:
+				title = Tr("$MSK_FlareCurveText", "Mid Flare");
+				iniKey = "fFlareCurve";
+				curVal = res.flareCurve;
+				src = res.flareCurveSource;
+				minV = -10.0f;
+				maxV = 20.0f;
+				smallStep = 0.5f;
+				bigStep = 2.0f;
 				break;
 			case FloatField::kSkirtGap:
 				title = Tr("$MSK_GapText", "Skirt / Leg Gap");
@@ -532,17 +562,17 @@ namespace TargetMenu
 				break;
 			}
 
-			const std::string valStr = isIntDeg ? std::format("{:.0f}°", curVal) : std::format("{:.1f}", curVal);
-			const std::string body = std::format("{} ({:.0f}-{:.0f})\n{}\n{}: {} [{}]", title, minV, maxV,
+			const std::string valStr = isInt ? std::format("{:.0f}{}", curVal, unit) : std::format("{:.1f}{}", curVal, unit);
+			const std::string body = std::format("{} ({:.0f}..{:.0f}{})\n{}\n{}: {} ({})", title, minV, maxV, unit,
 				TargetHeader(actor, armor, a_scope), Tr("$MSK_MenuCurrentLabel", "Current"), valStr, SourceLabel(src));
 
 			const float              deltas[4] = { -bigStep, -smallStep, +smallStep, +bigStep };
 			std::vector<std::string> buttons;
 			for (int i = 0; i < 4; ++i) {
-				if (isIntDeg) {
-					buttons.push_back(std::format("{:+.0f}°", deltas[i]));
+				if (isInt) {
+					buttons.push_back(std::format("{:+.0f}{}", deltas[i], unit));
 				} else {
-					buttons.push_back(std::format("{:+.1f}", deltas[i]));
+					buttons.push_back(std::format("{:+.1f}{}", deltas[i], unit));
 				}
 			}
 			const bool hasReset = a_scope != Scope::kGlobal;
@@ -570,6 +600,12 @@ namespace TargetMenu
                         case FloatField::kFlareAngle:
                             r.flareAngle = v;
                             break;
+                        case FloatField::kFlareStart:
+                            r.flareStart = v;
+                            break;
+                        case FloatField::kFlareCurve:
+                            r.flareCurve = v;
+                            break;
                         case FloatField::kSkirtGap:
                             r.skirtGap = v;
                             break;
@@ -587,7 +623,10 @@ namespace TargetMenu
 				};
 
 				if (a_idx >= 0 && a_idx < 4) {
-					setField(std::clamp(curVal + deltasLocal[a_idx], minV, maxV));
+					const float nextVal = std::clamp(curVal + deltasLocal[a_idx], minV, maxV);
+					if (std::fabs(nextVal - curVal) > 1e-4f) {
+						setField(nextVal);
+					}
 					OpenFloatSubMenu(a_actorId, a_armorId, a_scope, a_field);
 				} else if (hasReset && a_idx == 4) {
 					setField(std::nullopt);
@@ -632,6 +671,8 @@ namespace TargetMenu
 				kCut,
 				kHip,
 				kFlare,
+				kFlareStart,
+				kFlareCurve,
 				kUnderwear,
 				kGap,
 				kGapStiff,
@@ -650,8 +691,12 @@ namespace TargetMenu
 				actions.push_back(DAct::kCut);
 				buttons.push_back(std::format("{}: {:.1f} ({})...", Tr("$MSK_HipEaseText", "Hip Ease"), res.hipEase, SourceLabel(res.hipEaseSource)));
 				actions.push_back(DAct::kHip);
-				buttons.push_back(std::format("{}: {:.0f}° ({})...", Tr("$MSK_FlareText", "Flare Angle"), res.flareAngle, SourceLabel(res.flareAngleSource)));
+				buttons.push_back(std::format("{}: {:.0f}° ({})...", Tr("$MSK_FlareText", "Hem Flare"), res.flareAngle, SourceLabel(res.flareAngleSource)));
 				actions.push_back(DAct::kFlare);
+				buttons.push_back(std::format("{}: {:.0f}% ({})...", Tr("$MSK_FlareStartText", "Flare Start"), res.flareStart, SourceLabel(res.flareStartSource)));
+				actions.push_back(DAct::kFlareStart);
+				buttons.push_back(std::format("{}: {:.1f} ({})...", Tr("$MSK_FlareCurveText", "Mid Flare"), res.flareCurve, SourceLabel(res.flareCurveSource)));
+				actions.push_back(DAct::kFlareCurve);
 				buttons.push_back(std::format("[{}] {} ({})", res.underwear ? "x" : " ", Tr("$MSK_UnderwearText", "Wear Underwear"), SourceLabel(res.underwearSource)));
 				actions.push_back(DAct::kUnderwear);
 				buttons.push_back(std::format("{}: {:.1f} ({})...", Tr("$MSK_GapText", "Skirt / Leg Gap"), res.skirtGap, SourceLabel(res.skirtGapSource)));
@@ -713,6 +758,12 @@ namespace TargetMenu
 				case DAct::kFlare:
 					OpenFloatSubMenu(a_actorId, a_armorId, a_scope, FloatField::kFlareAngle);
 					break;
+				case DAct::kFlareStart:
+					OpenFloatSubMenu(a_actorId, a_armorId, a_scope, FloatField::kFlareStart);
+					break;
+				case DAct::kFlareCurve:
+					OpenFloatSubMenu(a_actorId, a_armorId, a_scope, FloatField::kFlareCurve);
+					break;
 				case DAct::kUnderwear: {
 					const bool nextUw = !curUw;
 					if (a_scope == Scope::kGlobal) {
@@ -744,6 +795,8 @@ namespace TargetMenu
 						r.hemStyle.reset();
 						r.hipEase.reset();
 						r.flareAngle.reset();
+						r.flareStart.reset();
+						r.flareCurve.reset();
 						r.underwear.reset();
 						r.skirtGap.reset();
 						r.skirtGapNoBone.reset();

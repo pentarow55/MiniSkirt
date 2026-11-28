@@ -818,7 +818,8 @@ namespace Skirt
 	//  上は上端〜お尻の線の山（上と同じ smoothstep）を、元の半径より大きいときだけ使う（縮めない・広がり角度を付けない）。
 	//  差し替えた脚（帯の体）の腰が、服に付いていた体より張っていると、元の布から出るため（フルダの服で腰の横に素肌が出た）
 	inline int ALine(std::vector<std::vector<Vec3>>& a_shapes, const std::vector<std::vector<float>>& a_sleeve, const std::vector<Vec3>& a_band, float a_waist,
-		float a_hem, float a_ease, float a_angle, float a_top, std::string& a_log, bool a_keepLayers = false, bool a_expandOnly = false)
+		float a_hem, float a_ease, float a_angle, float a_top, std::string& a_log, bool a_keepLayers = false, bool a_expandOnly = false,
+		float a_flareStart = 0.0f, float a_flareCurve = 0.0f)
 	{
 		using namespace ALineDetail;
 		constexpr float   kRise = 8.0f;
@@ -901,6 +902,8 @@ namespace Skirt
 		// 体を 2 近く大きく見積もって、スカートがお尻から腰まで出っ張った（イソルダの農民の服 04。お尻が大きく見えた）。足りない分は押し出しが補う
 		const Grid  benvUp = Envelope(band, cx, cy, z0, nz, false, true);
 		const float tanA = std::tan(a_angle * kPi / 180.0f);
+		const float startFrac = (std::clamp)(a_flareStart, 0.0f, 100.0f) / 100.0f;
+		const float midOffset = (std::clamp)(a_flareCurve, -10.0f, 20.0f);
 		int         moved = 0;
 		for (std::size_t s = 0; s < a_shapes.size(); ++s) {
 			for (std::size_t i = 0; i < a_shapes[s].size(); ++i) {
@@ -921,18 +924,27 @@ namespace Skirt
 				const float ft = tf - fl;
 				const float RB = rb[t0] * (1 - ft) + rb[t1] * ft;
 				const float ZB = zb[t0] * (1 - ft) + zb[t1] * ft;
+				const float zTopStart = (std::max)(ZB, a_top - 2.0f);
+				const float zStart = ZB + (zTopStart - ZB) * startFrac;
 				const float r0 = (std::max)(env.Lerp(zf, tf), 1e-3f);
 				const float r0t = env.Lerp((a_top - z0) / kDz - 0.5f, tf);
-				const float r0b = env.Lerp((ZB - z0) / kDz - 0.5f, tf);
-				const float rhip = (std::max)(RB + a_ease, r0b);
+				const float r0s = env.Lerp((zStart - z0) / kDz - 0.5f, tf);
+				const float rBodyStart = startFrac > 1e-3f ? benvUp.Lerp((zStart - z0) / kDz - 0.5f, tf) : RB;
+				const float rStart = (std::max)(rBodyStart + a_ease, r0s);
 				float       rt;
-				if (a_expandOnly && p.z < ZB) {
-					rt = 0.0f;  // お尻の線より下は体の外形（下の bz）だけ
-				} else if (p.z < ZB) {
-					rt = rhip + tanA * (ZB - p.z);
+				if (a_expandOnly && p.z < zStart) {
+					rt = 0.0f;  // 開始位置より下は体の外形（下の bz）だけ
+				} else if (p.z < zStart) {
+					// 3 点（開始 u=0, 中間 u=0.5, 裾 u=1）を滑らかな 2 次カーブで結ぶ:
+					// D(u) = dHem * u + 4 * midOffset * u * (1 - u)
+					const float span = (std::max)(zStart - a_hem, 1.0f);
+					const float u = (std::max)(zStart - p.z, 0.0f) / span;
+					const float uClamped = (std::clamp)(u, 0.0f, 1.0f);
+					const float dHem = tanA * span;
+					rt = (std::max)(rStart + dHem * u + 4.0f * midOffset * uClamped * (1.0f - uClamped), 1.0f);
 				} else {
-					const float t = (std::clamp)((a_top - p.z) / (std::max)(a_top - ZB, 1e-3f), 0.0f, 1.0f);
-					rt = r0t + (rhip - r0t) * (t * t * (3.0f - 2.0f * t));
+					const float t = (std::clamp)((a_top - p.z) / (std::max)(a_top - zStart, 1e-3f), 0.0f, 1.0f);
+					rt = r0t + (rStart - r0t) * (t * t * (3.0f - 2.0f * t));
 				}
 				const float fade = (std::clamp)((a_top - p.z) / kRise, 0.0f, 1.0f);
 				const float bz = p.z < ZB ? benv.Lerp(zf, tf) : benvUp.Lerp(zf, tf);

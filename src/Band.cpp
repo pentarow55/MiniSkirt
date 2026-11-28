@@ -2617,7 +2617,8 @@ namespace Band
 		return hemNew;
 	}
 
-	void ShapeSkirt(RE::Actor* a_actor, const std::vector<RE::BSGeometry*>& a_skirts, float a_waist, float a_hem, float a_ease, float a_angle, bool a_keepLayers, bool a_expandOnly)
+	void ShapeSkirt(RE::Actor* a_actor, const std::vector<RE::BSGeometry*>& a_skirts, float a_waist, float a_hem, float a_ease, float a_angle, bool a_keepLayers,
+		bool a_expandOnly, float a_flareStart, float a_flareCurve)
 	{
 		auto it = g_state.find(a_actor->GetFormID());
 		if (it == g_state.end() || a_skirts.empty()) {
@@ -2751,7 +2752,7 @@ namespace Band
 		}
 		std::string log;
 		const auto  tRead = std::chrono::steady_clock::now();
-		const int   moved = Skirt::ALine(pos, sleeve, band, a_waist, a_hem, a_ease, a_angle, top, log, a_keepLayers, a_expandOnly);
+		const int   moved = Skirt::ALine(pos, sleeve, band, a_waist, a_hem, a_ease, a_angle, top, log, a_keepLayers, a_expandOnly, a_flareStart, a_flareCurve);
 		const auto  tShape = std::chrono::steady_clock::now();
 		for (std::size_t k = 0; k < items.size(); ++k) {
 			auto&            it2 = items[k];

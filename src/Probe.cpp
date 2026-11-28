@@ -40,7 +40,9 @@ namespace Probe
 			float hem{ 65.0f };            // 縮めたあとのすその高さ（足元 0・頭のてっぺん ≒ 128）。lengthPct から求める
 			bool  excludeElderly{ false }; // 年配の女性（種族が Elder）は何もしない
 			float hipEase{ 1.0f };         // A ライン: お尻まわりのゆとり（帯の体のいちばん外からの幅）
-			float flareAngle{ 5.0f };      // A ライン: お尻の線より下の広がり角度（度。0 でまっすぐ下）
+			float flareAngle{ 5.0f };      // A ライン: 裾の広がり角度（度。0 でまっすぐ下）
+			float flareStart{ 0.0f };      // 広がり開始位置（0=お尻の線、100=ウエスト直下）
+			float flareCurve{ 0.0f };      // 中間の広がり（-10..+20。0 で直線 A ライン、+ で中間がふんわり膨らむ）
 			float bandTop{ 78.0f };      // 帯（足首から）の上端。全 NPC 共通（体 nif ごとにファイル 1 個）
 			bool  remapWeights{ true };  // 縮めた頂点の骨の重みを、動かした先の高さの重みに写し替える
 			float skirtGap{ 1.0f };        // スカートを帯の体から離す幅（スカートにお尻の揺れ骨があるとき）
@@ -132,6 +134,10 @@ namespace Probe
 					g_cfg.hipEase = (std::max)(0.0f, F(val));
 				} else if (key == "flare_angle") {
 					g_cfg.flareAngle = (std::clamp)(F(val), 0.0f, 45.0f);
+				} else if (key == "flare_start") {
+					g_cfg.flareStart = (std::clamp)(F(val), 0.0f, 100.0f);
+				} else if (key == "flare_curve") {
+					g_cfg.flareCurve = (std::clamp)(F(val), -10.0f, 20.0f);
 				} else if (key == "remap_weights") {
 					g_cfg.remapWeights = B(val);
 				} else if (key == "band_top") {
@@ -168,6 +174,10 @@ namespace Probe
 					g_cfg.hipEase = (std::max)(0.0f, F(val));
 				} else if (key == "fFlareAngle") {
 					g_cfg.flareAngle = (std::clamp)(F(val), 0.0f, 45.0f);
+				} else if (key == "fFlareStart") {
+					g_cfg.flareStart = (std::clamp)(F(val), 0.0f, 100.0f);
+				} else if (key == "fFlareCurve") {
+					g_cfg.flareCurve = (std::clamp)(F(val), -10.0f, 20.0f);
 				} else if (key == "fBandTop") {
 					g_cfg.bandTop = F(val);
 				} else if (key == "fSkirtGap") {
@@ -759,6 +769,8 @@ namespace Probe
 			int                           hemStyle{ 1 };
 			float                         hipEase{ 1.0f };
 			float                         flareAngle{ 5.0f };
+			float                         flareStart{ 0.0f };
+			float                         flareCurve{ 0.0f };
 			bool                          underwear{ true };
 			float                         skirtGap{ 1.0f };
 			float                         skirtGapNoBone{ 1.0f };
@@ -817,6 +829,8 @@ namespace Probe
 			gdef.hemStyle = g_cfg.hemStyle;
 			gdef.hipEase = g_cfg.hipEase;
 			gdef.flareAngle = g_cfg.flareAngle;
+			gdef.flareStart = g_cfg.flareStart;
+			gdef.flareCurve = g_cfg.flareCurve;
 			gdef.underwear = g_cfg.underwear;
 			gdef.skirtGap = g_cfg.skirtGap;
 			gdef.skirtGapNoBone = g_cfg.skirtGapNoBone;
@@ -857,6 +871,8 @@ namespace Probe
 			a_job.hemStyle = resolved.hemStyle;
 			a_job.hipEase = resolved.hipEase;
 			a_job.flareAngle = resolved.flareAngle;
+			a_job.flareStart = resolved.flareStart;
+			a_job.flareCurve = resolved.flareCurve;
 			a_job.underwear = resolved.underwear;
 			a_job.skirtGap = resolved.skirtGap;
 			a_job.skirtGapNoBone = resolved.skirtGapNoBone;
@@ -958,7 +974,7 @@ namespace Probe
 			} else if (a_k == 2) {
 				// 鎧は重なった板の間隔を保って広げる（比で縮尺すると板が同じ半径に潰れて背中に穴が空いた）。
 				// 切ったスカートが無ければ（丈 100% など）A ラインにはせず、差し替えた脚の腰に当たる所だけ外へ出す（形は元のまま）
-				Band::ShapeSkirt(actor, g_skirts, g_cfg.waist, g_hemNew < 1e8f ? g_hemNew : g_curHem, a_job.hipEase, a_job.flareAngle, g_armorMode, !g_anyCut);
+				Band::ShapeSkirt(actor, g_skirts, g_cfg.waist, g_hemNew < 1e8f ? g_hemNew : g_curHem, a_job.hipEase, a_job.flareAngle, g_armorMode, !g_anyCut, a_job.flareStart, a_job.flareCurve);
 			} else {
 				Band::FitSkirt(actor, g_skirts, g_hemNew < 1e8f ? g_hemNew : g_curHem, a_job.skirtGap, a_job.skirtGapNoBone, g_cfg.bodyWeights);
 				g_skirtActors.insert(a_job.id);
@@ -1358,6 +1374,7 @@ namespace Probe
 #endif
 			const bool topChanged = std::lround(old.bandTop) != std::lround(g_cfg.bandTop);
 			const bool changed = topChanged || old.enabled != g_cfg.enabled || old.hem != g_cfg.hem || old.hemStyle != g_cfg.hemStyle || old.excludeElderly != g_cfg.excludeElderly || old.hipEase != g_cfg.hipEase || old.flareAngle != g_cfg.flareAngle ||
+			                     old.flareStart != g_cfg.flareStart || old.flareCurve != g_cfg.flareCurve ||
 			                     old.skirtGap != g_cfg.skirtGap || old.skirtGapNoBone != g_cfg.skirtGapNoBone || old.waist != g_cfg.waist ||
 			                     old.remapWeights != g_cfg.remapWeights || old.underwear != g_cfg.underwear;
 			if (!changed) {
@@ -1540,6 +1557,8 @@ namespace Probe
 		gdef.hemStyle = g_cfg.hemStyle;
 		gdef.hipEase = g_cfg.hipEase;
 		gdef.flareAngle = g_cfg.flareAngle;
+		gdef.flareStart = g_cfg.flareStart;
+		gdef.flareCurve = g_cfg.flareCurve;
 		gdef.underwear = g_cfg.underwear;
 		gdef.skirtGap = g_cfg.skirtGap;
 		gdef.skirtGapNoBone = g_cfg.skirtGapNoBone;
